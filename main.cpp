@@ -2,33 +2,37 @@
 
 #include <opencv2/opencv.hpp>
 
-using namespace cv;
+int camera_id = 1;
 
 int main( int argc, char** argv )
 {
-    // open the first webcam plugged in the computer
-    cv::VideoCapture camera(1);
-    if (!camera.isOpened()) {
-        std::cerr << "ERROR: Could not open camera" << std::endl;
-        return 1;
-    }
+    printf("OpenCV Flow Sensor");
 
-    // create a window to display the images from the webcam
-    cv::namedWindow("Webcam", cv::WINDOW_AUTOSIZE);
+    cv::VideoCapture camera;
+
+    camera.open(camera_id, cv::CAP_ANY);
+
+    if (!camera.isOpened()) {
+        printf("Could not open camera");
+        return -1;
+    }
 
     // this will contain the image from the webcam
     cv::Mat frame;
-        
     
-    
-    // display the frame until you press a key
     while (1) {
 
-        // capture the next frame from the webcam
-        camera >> frame;
-        // show the image on the window
-        cv::imshow("Webcam", frame);
-        // wait (10ms) for a key to be pressed
+        camera.read(frame);
+
+        // check if we succeeded
+        if (frame.empty()) {
+            printf("Empty frame");
+            break;
+        }
+
+        // show live and wait for a key with timeout long enough to show images
+        cv::imshow("Camera feed", frame);
+
         if (cv::waitKey(10) >= 0)
             break;
     }
