@@ -9,6 +9,7 @@
                 "-g",
                 "${file}",
                 "${fileDirname}/src/opticalflow.cpp",
+                "${fileDirname}/src/trackFeatures.cpp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
 				"-I","C:\\opencv\\OpenCV-MinGW-Build-OpenCV-4.1.1-x64\\include",

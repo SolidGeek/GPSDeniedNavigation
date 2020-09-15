@@ -2,6 +2,9 @@
 #define OPTICAL_FLOW_H
 
 #include <opencv2/opencv.hpp>
+#include <iostream>
+#include <ctype.h>
+#include "trackFeatures.h"
 
 class OpticalFlow
 {
@@ -18,23 +21,35 @@ public:
     /**
      * Calculate pixel flow and convert to velocity (m/s) if distance is supplied
     */
-    cv::Point2f process_frame( cv::Mat frame, float dt, float distance = 0 );
+    cv::Point2f compute_dense_flow( cv::Mat frame, float dt, float distance = 0 );
+
+    cv::Point2f compute_sparse_flow( cv::Mat raw, float dt, float distance = 0 ); 
+
+    cv::Point2f compute_flow_features( cv::Mat raw, float dt, float distance = 0 ); 
 
     cv::Mat get_frame( void );
 
 private:
 
+    cv::Mat grid; 
+
     cv::Mat frame;
-    cv::Mat prev_frame;
+    cv::Mat prev_gray;
     cv::Size size;
+    cv::Point2f flow;
+    cv::Point2f velocity;
+
+    std::vector<int> status;
+    std::vector<cv::Point2f> features_current, features_previous, features_tmp, useless;
 
     int interval;
     
+    void process_frame( cv::Mat raw, cv::Mat &output );
     
     /**
      * Compute optical flow in pixels / second. Sum is the total pixel change while count is the total number of points for the frame.
     */
-    float compute_flow( float sum, int count, float dt );
+    float compute_pixel_velocity( float sum, int count, float dt );
 
     float compute_velocity( float flow, int axis_length, float distance );
 

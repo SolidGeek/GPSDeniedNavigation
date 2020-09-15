@@ -12,41 +12,51 @@ OpticalFlow::OpticalFlow( int frame_width, int frame_height, int scaledown, int 
     this->size = cv::Size(scale_width, scale_height);
 
     this->interval = interval;
+
+    // Create fixed grid for sparse method
+    for ( int x = 0; x < scale_width; x += this->interval ){
+        for ( int y = 0; y < scale_height; y += this->interval ){
+            this->grid.push_back( cv::Point2f(x,y) );
+        }
+    }
 }
 
-cv::Point2f OpticalFlow::process_frame( cv::Mat frame, float dt, float distance )
+void OpticalFlow::process_frame( cv::Mat raw, cv::Mat &output ){
+    // Resize the frame to specified size
+    cv::resize(raw, this->frame, this->size);
+
+    // Convert to grayscale (and use this to perform flow analysis)
+    cv::cvtColor(this->frame, output, cv::COLOR_BGR2GRAY);
+}
+
+cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distance )
 {
-    cv::Point2f vel; 
-    cv::Mat gray;
-    cv::Mat flow;
+    cv::Mat vectors;    // Calculated flow vectors
+    cv::Mat gray;       // Output image for processing
 
     float xsum, ysum = 0;
     float xflow, yflow;
     int count = 0;
 
-    // Resize the frame to specified size
-    cv::resize(frame, this->frame, this->size);
+    // Convert raw frame to scaled down grayscale
+    this->process_frame( raw, gray );
+    
+    if( !this->prev_gray.empty() ){
 
-    // Convert to grayscale (and use this to perform flow analysis)
-    cv::cvtColor(this->frame, gray, cv::COLOR_BGR2GRAY);
+        // Use opencv to calculate flow between new frame and previous frame
+        cv::calcOpticalFlowFarneback( this->prev_gray, gray, vectors, this->pyr_scale, this->levels, this->winsize, this->iterations, this->poly_n, this->poly_sigma, 0);
 
-    if( ! this->prev_frame.empty() ){
-
-        // Used opencv to calculate flow between new frame and previous frame
-        cv::calcOpticalFlowFarneback( this->prev_frame, gray, flow, this->pyr_scale, this->levels, this->winsize, this->iterations, this->poly_n, this->poly_sigma, 0);
-
-        for (int y = 0; y < flow.rows; y+=this->interval)
+        for (int y = 0; y < vectors.rows; y+=this->interval)
         {
-            for (int x = 0; x < flow.cols; x+=this->interval)
+            for (int x = 0; x < vectors.cols; x+=this->interval)
             {
                 // Extract the vector the flow in this 
-                cv::Point2f vector = flow.at<cv::Point2f>(y,x);
+                cv::Point2f vector = vectors.at<cv::Point2f>(y,x);
 
                 xsum += vector.x;
                 ysum += vector.y;
 
                 // Visualize the flow in the frame
-
                 cv::line(this->frame, cv::Point(x,y), cv::Point(x+int(vector.x),y+int(vector.y)), cv::Scalar(0, 255, 0) );
                 cv::circle(this->frame, cv::Point(x,y), 1, cv::Scalar(0, 255, 0) );
 
@@ -55,22 +65,150 @@ cv::Point2f OpticalFlow::process_frame( cv::Mat frame, float dt, float distance 
         }
 
         // Calculate flow from sums
-        vel.x = this->compute_flow( xsum, count, dt);
-        vel.y = this->compute_flow( ysum, count, dt);
+        this->flow.x = this->compute_pixel_velocity( xsum, count, dt);
+        this->flow.y = this->compute_pixel_velocity( ysum, count, dt);
     }
+
+    this->prev_gray = gray;
 
     if( distance != 0 ){
 
-        vel.x = this->compute_velocity( vel.x, gray.cols, distance );
-        vel.y = this->compute_velocity( vel.y, gray.rows, distance );
+        this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
+        this->velocity.x = this->compute_velocity( this->flow.x, gray.rows, distance );
+
+        return this->velocity;
     }
 
-    this->prev_frame = gray;
-
-    return vel;
+    return this->flow;
 }
 
-float OpticalFlow::compute_flow( float sum, int count, float dt ){
+cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
+
+    cv::Mat vectors;    // Calculated flow vectors
+    cv::Mat gray;       // Output image for processing
+    std::vector<uchar> status;
+    std::vector<float> errors;
+
+    float xsum, ysum = 0;
+    float xflow, yflow;
+    int count = 0;
+
+    // Convert raw frame to scaled down grayscale
+    this->process_frame( raw, gray );
+
+    if( !this->prev_gray.empty() ){
+
+        cv::calcOpticalFlowPyrLK( this->prev_gray, gray, this->grid, vectors, status, errors, cv::Size(21, 21), 3 );
+        this->grid = vectors;
+
+        for (int y = 0; y < vectors.rows; y++)
+        {
+            for (int x = 0; x < vectors.cols; x++)
+            {
+                cv::Point2f start   = grid.at<cv::Point2f>(y,x);
+                cv::Point2f end     = vectors.at<cv::Point2f>(y,x);
+       
+                if( status[count] == 1 ){
+                    
+                    if( errors[count] < 2.5f )
+                        // printf( "%.2f", errors[count] );
+                        // Visualize the flow in the frame
+                        cv::line(this->frame, start, end, cv::Scalar(0, 255, 0) );
+                }
+                
+                cv::circle(this->frame, start, 1, cv::Scalar(0, 255, 0) );
+
+                count++;
+            }
+        }
+
+    }
+
+    this->prev_gray = gray;
+
+    if( distance != 0 ){
+
+        /*  this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
+        this->velocity.x = this->compute_velocity( this->flow.x, gray.rows, distance );
+
+        return this->velocity; */
+    }
+
+    return this->flow;
+
+}
+
+
+cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float distance ){
+
+    cv::Mat gray; // Output image for processing
+    
+    if (status.empty()) {
+		status.resize(200, 2); // Request = 2 features = 30 
+	}
+
+    float xsum, ysum = 0;
+    int count = 0;
+
+    
+
+    // Convert raw frame to scaled down grayscale
+    this->process_frame( raw, gray );
+
+    // trackFeatures are made for stereo, so first two arguments is left and right image. 
+    trackFeatures(gray, gray, this->features_current, this->useless, this->status, 0);
+
+    if (!this->features_current.empty() && !this->features_previous.empty()) {
+		//calculate pixel flow
+
+		for (int i = 0; i < this->status.size(); i++) {
+			//just use active features
+			if ( status[i] == 1 ) {
+				xsum += features_current[i].x - features_previous[i].x;
+				ysum += features_current[i].y - features_previous[i].y;
+
+                // Visualize the flow in the frame
+                cv::line(this->frame, cv::Point(features_previous[i].x,features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(0, 255, 0) );
+                cv::circle(this->frame, cv::Point(features_current[i].x,features_current[i].y), 1, cv::Scalar(0, 255, 0) );
+
+				count++;
+			}
+		}
+
+        // Calculate flow from sums
+        this->flow.x = this->compute_pixel_velocity( xsum, count, dt);
+        this->flow.y = this->compute_pixel_velocity( ysum, count, dt);
+
+	}
+
+    this->features_previous = this->features_current;
+
+    //update feature status
+	for (int i = 0; i < this->status.size(); i++) {
+		//new and now active
+		if (this->status[i] == 2) {
+			this->status[i] = 1;
+		}
+
+		//inactive
+		if (this->status[i] == 0) {
+			this->status[i] = 2;
+		}
+	}
+
+    if( distance != 0 ){
+
+        this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
+        this->velocity.y = this->compute_velocity( this->flow.y, gray.rows, distance );
+
+        return this->velocity;
+    }
+
+    return this->flow;
+
+}
+
+float OpticalFlow::compute_pixel_velocity( float sum, int count, float dt ){
     // Calculate pixels per second
     return (sum / (float)count) / dt;
 }
