@@ -81,6 +81,9 @@ private:
 
         void init_more_points( const cv::Mat &img, std::vector<cv::Point2f> &features, std::vector<int> &feature_status );
 
+
+        int find_valid_keypoints( std::vector<cv::KeyPoint> keypoints, std::vector<cv::KeyPoint> good, std::vector<cv::KeyPoint> unused, unsigned int distance, int max_keypoints );
+
 };
 
 #endif
