@@ -31,6 +31,8 @@ public:
 
 private:
 
+    FeatureTracker * tracker = NULL; 
+
     cv::Mat grid; 
 
     cv::Mat frame;

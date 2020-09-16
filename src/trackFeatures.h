@@ -41,15 +41,46 @@
 #define KLT_POINT_HANDLING
 
 #include <opencv2/core/core.hpp>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/core/operations.hpp>
+#include <opencv2/core/types_c.h>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <cstdio>
 #include <vector>
-#include <chrono>
 #include <iostream>
 
-// extracts points on a grid and tracks them over time. img_r can be a empty cv::Mat, in that case no disparity computation is done
-// output variables are z_all and updateVect that need to point to existing arrays of the correct size (3*sizeof(double)*numPoints for z_all and sizeof(unsigned char)*numPoints for updateVect)
-// stereo: 0 = never do stereo, 1 = do stereo with new features, 2 = always do stereo
-void trackFeatures(const cv::Mat &img_l, const cv::Mat &img_r, std::vector<cv::Point2f> &z_all_l, std::vector<cv::Point2f> &z_all_r,
-        std::vector<int> &updateVect, int stereo = 0);
+class FeatureTracker
+{
+
+public:
+
+        FeatureTracker();
+
+        FeatureTracker( std::vector<int> &feature_status, int number_of_features );
+
+        // extracts points on a grid and tracks them over time. img_r can be a empty cv::Mat, in that case no disparity computation is done
+        // output variables are z_all and updateVect that need to point to existing arrays of the correct size (3*sizeof(double)*numPoints for z_all and sizeof(unsigned char)*numPoints for updateVect)
+        // stereo: 0 = never do stereo, 1 = do stereo with new features, 2 = always do stereo
+        void track_features(const cv::Mat &img, std::vector<cv::Point2f> &z_all, std::vector<int> &updateVect );
+
+        void update_feature_status( std::vector<int> &feature_status );
+
+private:
+
+        cv::Mat prev_img;
+        std::vector<cv::Point2f> prev_corners;
+        std::vector<unsigned char> prev_status;
+
+        // for throttling debug messages
+        int debug_msg_count = 0;
+
+        void init_more_points( const cv::Mat &img, std::vector<cv::Point2f> &features, std::vector<int> &feature_status );
+
+};
 
 #endif

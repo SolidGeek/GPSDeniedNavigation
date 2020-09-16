@@ -33,9 +33,9 @@ int main( int argc, char** argv )
     }
 
     // camera.set(cv::CAP_PROP_SETTINGS, 0); // Open manufactorer settings
-    camera.set(cv::CAP_PROP_GAIN, 16); 
-    camera.set(cv::CAP_PROP_AUTO_EXPOSURE, 0);
-    camera.set(cv::CAP_PROP_EXPOSURE, 0); 
+    // camera.set(cv::CAP_PROP_GAIN, 16); 
+    // camera.set(cv::CAP_PROP_AUTO_EXPOSURE, true);
+    // camera.set(cv::CAP_PROP_EXPOSURE, 0); 
 
     width   = camera.get(cv::CAP_PROP_FRAME_WIDTH);
     height  = camera.get(cv::CAP_PROP_FRAME_HEIGHT);

@@ -5,6 +5,10 @@ OpticalFlow::OpticalFlow(){
 
 OpticalFlow::OpticalFlow( int frame_width, int frame_height, int scaledown, int interval )
 {
+
+    // Initialize feature tracker and track 100 points
+    this->tracker = new FeatureTracker( this->status, 100 );
+
     int scale_width = frame_width/scaledown;
     int scale_height = frame_height/scaledown;
 
@@ -143,9 +147,9 @@ cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float dis
 
     cv::Mat gray; // Output image for processing
     
-    if (status.empty()) {
-		status.resize(200, 2); // Request = 2 features = 30 
-	}
+    /* if (status.empty()) {
+		status.resize(100, 2); // Request = 2 features = 30 
+	}*/
 
     float xsum, ysum = 0;
     int count = 0;
@@ -156,7 +160,7 @@ cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float dis
     this->process_frame( raw, gray );
 
     // trackFeatures are made for stereo, so first two arguments is left and right image. 
-    trackFeatures(gray, gray, this->features_current, this->useless, this->status, 0);
+    tracker->track_features(gray, this->features_current, this->status );
 
     if (!this->features_current.empty() && !this->features_previous.empty()) {
 		//calculate pixel flow
@@ -183,18 +187,7 @@ cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float dis
 
     this->features_previous = this->features_current;
 
-    //update feature status
-	for (int i = 0; i < this->status.size(); i++) {
-		//new and now active
-		if (this->status[i] == 2) {
-			this->status[i] = 1;
-		}
-
-		//inactive
-		if (this->status[i] == 0) {
-			this->status[i] = 2;
-		}
-	}
+    tracker->update_feature_status( this->status );
 
     if( distance != 0 ){
 
