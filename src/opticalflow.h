@@ -4,14 +4,12 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <ctype.h>
-#include "trackFeatures.h"
+#include "featureTracker.h"
 
 class OpticalFlow
 {
 
 public:
-
-    OpticalFlow();
 
     /**
      * Constructor

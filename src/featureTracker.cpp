@@ -1,44 +1,11 @@
-/****************************************************************************
+/**
+ * featureTracker.cpp
  *
- *   Copyright (c) 2016 AIT, ETH Zurich. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name AIT nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- ****************************************************************************/
-/*
- * trackFeatures.cpp
- *
- *  Created on: Mar 9, 2016
- *      Author: nicolas
+ * Created on: September 17, 2020
+ * Author: SolidGeek
  */
 
-
-#include "trackFeatures.h"
+#include "featureTracker.h"
 
 bool compare_keypoints(const cv::KeyPoint &first, const cv::KeyPoint &second) {
     return first.response > second.response;
@@ -131,7 +98,7 @@ void FeatureTracker::update_feature_status( std::vector<int> &feature_status ){
 
 }
 
-int FeatureTracker::find_valid_keypoints( std::vector<cv::KeyPoint> keypoints, std::vector<cv::KeyPoint> good, std::vector<cv::KeyPoint> unused, unsigned int distance, int max_keypoints ){
+int FeatureTracker::find_valid_keypoints( std::vector<cv::KeyPoint> &keypoints, std::vector<cv::KeyPoint> &good, std::vector<cv::KeyPoint> * unused, unsigned int distance, int max_good ){
 
     // Check if the new features are far enough from existing points
     int newPtIdx = 0;
@@ -147,8 +114,8 @@ int FeatureTracker::find_valid_keypoints( std::vector<cv::KeyPoint> keypoints, s
             int existing_pt_y = prev_corners[j].y;
             if (abs(existing_pt_x - new_pt_x) < distance && abs(existing_pt_y - new_pt_y) < distance) {
                 far_enough = false;
-                
-                unused.push_back(keypoints[newPtIdx]);
+                if( unused != NULL)
+                    unused->push_back(keypoints[newPtIdx]);
                 break;
             }
         }
@@ -159,20 +126,20 @@ int FeatureTracker::find_valid_keypoints( std::vector<cv::KeyPoint> keypoints, s
                 int existing_pt_y = good[j].pt.y;
                 if (abs(existing_pt_x - new_pt_x) < distance && abs(existing_pt_y - new_pt_y) < distance) {
                     far_enough = false;
-                    unused.push_back(keypoints[newPtIdx]);
+                    if( unused != NULL)
+                        unused->push_back(keypoints[newPtIdx]);
                     break;
                 }
             }
             if (far_enough) {
                 good.push_back(keypoints[newPtIdx]);
-                if (good.size() == max_keypoints)
+                if (good.size() == max_good)
                     break;
             }
         }
     }
 
     return newPtIdx;
-
 }
 
 void FeatureTracker::init_more_points(const cv::Mat &img, std::vector<cv::Point2f> &features, std::vector<int> &feature_status ) {
@@ -191,13 +158,15 @@ void FeatureTracker::init_more_points(const cv::Mat &img, std::vector<cv::Point2
     if (!targetNumPoints)
         return;
 
-    std::vector<cv::KeyPoint> goodKeypoints, unusedKeypoints;
-
     int numBinsX = 4;
     int numBinsY = 4;
     int binWidth = img.cols / numBinsX;
     int binHeight = img.rows / numBinsY;
-    int targetFeaturesPerBin = (feature_status.size() - 1) / (numBinsX * numBinsY) + 1;  // total number of features that should be in each bin
+    int targetFeaturesPerBin = (feature_status.size() - 1) / (numBinsX * numBinsY) + 1;  // Total number of features that should be in each bin
+    unsigned int dist = binWidth / targetFeaturesPerBin; // Minimal distance between two features 
+
+    // Prepare vectors to hold keypoints
+    std::vector<cv::KeyPoint> goodKeypoints, unusedKeypoints;
 
     // Prepare 4x4 matrix each cell with a zero
     std::vector<std::vector<int>> featuresPerBin(numBinsX, std::vector<int>(numBinsY, 0));
@@ -216,24 +185,18 @@ void FeatureTracker::init_more_points(const cv::Mat &img, std::vector<cv::Point2
                 printf("Warning: writing to binY out of bounds: %d >= %d\n", binY, numBinsY);
                 continue;
             }
-
             featuresPerBin[binX][binY]++;
         }
     }
 
-    // Minimal distance between two features 
-    unsigned int dist = binWidth / targetFeaturesPerBin;
-
-    // go through each cell and detect features
+    // Go through each cell and detect features
     for (int x = 0; x < numBinsX; x++) {
         for (int y = 0; y < numBinsY; y++) {
-
             // Calculated missing features in bin[x][y]
             int neededFeatures = std::max(0, targetFeaturesPerBin - featuresPerBin[x][y]);
 
             // If any features / points are missing
             if (neededFeatures) {
-
                 // Determine region the feature should be placed in.
                 int col_from = x * binWidth;
                 int col_to = std::min((x + 1) * binWidth, img.cols);
@@ -254,9 +217,8 @@ void FeatureTracker::init_more_points(const cv::Mat &img, std::vector<cv::Point2
                     keypoints[i].pt.y += row_from;
                 }
 
-
                 // Check if the new features are far enough from existing points
-                int newPtIdx = this->find_valid_keypoints( keypoints, goodKeypointsBin, unusedKeypoints, dist, neededFeatures);
+                int newPtIdx = this->find_valid_keypoints( keypoints, goodKeypointsBin, &unusedKeypoints, dist, neededFeatures);
                 
                 // insert the good points into the vector containing the new points of the whole image
                 goodKeypoints.insert(goodKeypoints.end(), goodKeypointsBin.begin(), goodKeypointsBin.end());
@@ -284,43 +246,9 @@ void FeatureTracker::init_more_points(const cv::Mat &img, std::vector<cv::Point2
 
     // It also might have found less features then requested. Try to insert new points that were not used in the bins
     if (goodKeypoints.size() < targetNumPoints) {
-        
         sort(unusedKeypoints.begin(), unusedKeypoints.end(), compare_keypoints);
-
         dist /= 2;  // reduce the distance criterion
-
-        for (int newPtIdx = 0; newPtIdx < unusedKeypoints.size(); newPtIdx++) {
-            int new_pt_x = unusedKeypoints[newPtIdx].pt.x;
-            int new_pt_y = unusedKeypoints[newPtIdx].pt.y;
-
-            bool far_enough = true;
-            for (int j = 0; j < prev_corners.size(); j++) {
-                if (prev_status[j] == 0)
-                    continue;
-                int existing_pt_x = prev_corners[j].x;
-                int existing_pt_y = prev_corners[j].y;
-                if (abs(existing_pt_x - new_pt_x) < dist && abs(existing_pt_y - new_pt_y) < dist) {
-                    far_enough = false;
-                    break;
-                }
-            }
-            if (far_enough) {
-                // check if the new feature is too close to a new one
-                for (int j = 0; j < goodKeypoints.size(); j++) {
-                    int existing_pt_x = goodKeypoints[j].pt.x;
-                    int existing_pt_y = goodKeypoints[j].pt.y;
-                    if (abs(existing_pt_x - new_pt_x) < dist && abs(existing_pt_y - new_pt_y) < dist) {
-                        far_enough = false;
-                        break;
-                    }
-                }
-                if (far_enough) {
-                    goodKeypoints.push_back(unusedKeypoints[newPtIdx]);
-                    if (goodKeypoints.size() == targetNumPoints)
-                        break;
-                }
-            }
-        }
+        int newPtIdx = this->find_valid_keypoints( unusedKeypoints, goodKeypoints, NULL, dist, targetNumPoints);
     }
 
     if (goodKeypoints.empty()) {
@@ -331,32 +259,27 @@ void FeatureTracker::init_more_points(const cv::Mat &img, std::vector<cv::Point2
         return;
     }
 
-    std::vector<cv::Point2f> leftPoints;
+    // Array to store the coordinates of the good keypoints in.
+    std::vector<cv::Point2f> points;
    
-    leftPoints.resize(goodKeypoints.size());
-    for (int i = 0; i < goodKeypoints.size(); i++)
-    {
-        leftPoints[i] = goodKeypoints[i].pt;
-    }
-
-    if (leftPoints.size() < targetNumPoints) {
-        debug_msg_count ++;
-        if (debug_msg_count % 50 == 0) {
-            printf("Number of good matches: %d, desired: %d\n", (int) leftPoints.size(), targetNumPoints);
-        }
+    points.resize(goodKeypoints.size());
+    for (int i = 0; i < goodKeypoints.size(); i++){
+        points[i] = goodKeypoints[i].pt;
     }
 
     if (prev_corners.size() < feature_status.size())
         prev_corners.resize(feature_status.size());
 
+    // Loop through each item in feature array, and insert new point if requested (status[i] == 2)
     int matches_idx = 0;
     for (int i = 0; i < feature_status.size(); i++) {
         if (feature_status[i] == 2) {
-            if (matches_idx < leftPoints.size()) {
-                prev_corners[i] = leftPoints[matches_idx];
+            if (matches_idx < points.size()) {
+                // Insert the point in both prev and current features, as to not introduce wrong flows
+                prev_corners[i] = points[matches_idx];
                 prev_status[i] = 1;
 
-                features[i] = leftPoints[matches_idx];
+                features[i] = points[matches_idx];
 
                 matches_idx++;
             } else {

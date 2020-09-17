@@ -69,7 +69,7 @@ int main( int argc, char** argv )
         ypos += velocity.y * dt;
 
         // printf("x%+.3f y%+.3f m/s \n", velocity.x, velocity.y );
-        // printf("x%+.3f y%+.3f m \n", xpos, ypos );
+        printf("x%+.3f y%+.3f m \n", xpos, ypos );
 
         // show live and wait for a key with timeout long enough to show images
         cv::imshow("Camera feed", flowsense.get_frame() );
