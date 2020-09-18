@@ -48,9 +48,9 @@ cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distan
         // Use opencv to calculate flow between new frame and previous frame
         cv::calcOpticalFlowFarneback( this->prev_gray, gray, vectors, this->pyr_scale, this->levels, this->winsize, this->iterations, this->poly_n, this->poly_sigma, 0);
 
-        for (int y = 0; y < vectors.rows; y+=this->interval)
+        for (int y = this->interval/2; y < vectors.rows; y+=this->interval)
         {
-            for (int x = 0; x < vectors.cols; x+=this->interval)
+            for (int x = this->interval/2; x < vectors.cols; x+=this->interval)
             {
                 // Extract the vector the flow in this 
                 cv::Point2f vector = vectors.at<cv::Point2f>(y,x);
@@ -59,8 +59,8 @@ cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distan
                 ysum += vector.y;
 
                 // Visualize the flow in the frame
-                cv::line(this->frame, cv::Point(x,y), cv::Point(x+int(vector.x),y+int(vector.y)), cv::Scalar(0, 255, 0) );
-                cv::circle(this->frame, cv::Point(x,y), 1, cv::Scalar(0, 255, 0) );
+                cv::line(this->frame, cv::Point(x,y), cv::Point(x-int(vector.x),y-int(vector.y)), cv::Scalar(255, 255, 255) );
+                cv::circle(this->frame, cv::Point(x,y), 2, cv::Scalar(255, 255, 255), -1 );
 
                 count++;
             }
@@ -217,8 +217,8 @@ cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float dis
                         
 
                         // Visualize the flow in the frame
-                        cv::line(this->frame, cv::Point(features_previous[i].x,features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255-length*10, 255-length*10, 255) );
-                        cv::circle(this->frame, cv::Point(features_current[i].x,features_current[i].y), 2, cv::Scalar(255, 255, 255) );
+                        cv::line(this->frame, cv::Point(features_previous[i].x,features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255, 255, 255) );
+                        cv::circle(this->frame, cv::Point(features_current[i].x,features_current[i].y), 2, cv::Scalar(255, 255, 255), -1 );
 
 						count_confidense++;
                         
@@ -271,4 +271,8 @@ float OpticalFlow::compute_velocity( float flow, int axis_length, float distance
 
 cv::Mat OpticalFlow::get_frame( void ){
     return this->frame;
+}
+
+cv::Size OpticalFlow::get_size( void ){
+    return this->size;
 }
