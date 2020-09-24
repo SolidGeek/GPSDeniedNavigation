@@ -193,7 +193,6 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
 
             for (int i = 0; i < status.size(); i++) {
                 if( status[i] == 1){
-
                     float val_x = features_current[i].x - features_previous[i].x;
 					float val_y = features_current[i].y - features_previous[i].y;
 					//check if inside confidence interval
@@ -204,14 +203,11 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
 						xsum_confidense += val_x;
 						ysum_confidense += val_y;
 
-                        
-
                         // Visualize the flow in the frame
                         cv::line(this->frame, cv::Point(features_previous[i].x,features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255, 255, 255) );
                         cv::circle(this->frame, cv::Point(features_current[i].x,features_current[i].y), 2, cv::Scalar(255, 255, 255), -1 );
 
-						count_confidense++;
-                        
+						count_confidense++; 
 					} 
                 }
             }
