@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include "featureTracker.h"
 
+#define M_PI 3.14159265358979323846
+
 class OpticalFlow
 {
 
@@ -14,7 +16,7 @@ public:
     /**
      * Constructor
     */
-    OpticalFlow( int frame_width, int frame_height, int scaledown = 1, int interval = 16 );
+    OpticalFlow( int frame_width, int frame_height, int scaledown = 1, int interval = 16, float fov = 64.0 );
 
     /**
      * Calculate pixel flow and convert to velocity (m/s) if distance is supplied
@@ -22,8 +24,6 @@ public:
     cv::Point2f compute_dense_flow( cv::Mat frame, float dt, float distance = 0 );
 
     cv::Point2f compute_sparse_flow( cv::Mat raw, float dt, float distance = 0 ); 
-
-    cv::Point2f compute_flow_features( cv::Mat raw, float dt, float distance = 0 ); 
 
     cv::Mat get_frame( void );
 
@@ -45,6 +45,7 @@ private:
     std::vector<cv::Point2f> features_current, features_previous, features_tmp, useless;
 
     int interval;
+    float fov;
     
     void process_frame( cv::Mat raw, cv::Mat &output );
     

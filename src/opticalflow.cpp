@@ -1,26 +1,23 @@
 #include "opticalflow.h"
 
 
-OpticalFlow::OpticalFlow( int frame_width, int frame_height, int scaledown, int interval )
+OpticalFlow::OpticalFlow( int frame_width, int frame_height, int scaledown, int interval, float fov )
 {
-
-    // Initialize feature tracker and track 100 points
-    this->tracker = new FeatureTracker( this->status, 100 );
-
     int scale_width = frame_width/scaledown;
     int scale_height = frame_height/scaledown;
 
     // Calculate scaled size
     this->size = cv::Size(scale_width, scale_height);
-
     this->interval = interval;
+    this->fov = fov * M_PI / 180.0; // Convert fov angle to radians 
 
-    // Create fixed grid for sparse method
-    for ( int x = 0; x < scale_width; x += this->interval ){
-        for ( int y = 0; y < scale_height; y += this->interval ){
-            this->grid.push_back( cv::Point2f(x,y) );
-        }
-    }
+    int features_count = (scale_width * scale_height)/pow(interval, 2);
+
+    printf("Scaled frame size is: %d x %d px (width x height) \n", scale_width, scale_height);
+    printf("Tracking %d No. of points for sparse method \n", features_count);
+
+    // Initialize feature tracker
+    this->tracker = new FeatureTracker( this->status, features_count );
 }
 
 void OpticalFlow::process_frame( cv::Mat raw, cv::Mat &output ){
@@ -76,7 +73,7 @@ cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distan
     if( distance != 0 ){
 
         this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
-        this->velocity.x = this->compute_velocity( this->flow.x, gray.rows, distance );
+        this->velocity.y = this->compute_velocity( this->flow.y, gray.rows, distance );
 
         return this->velocity;
     }
@@ -84,6 +81,7 @@ cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distan
     return this->flow;
 }
 
+/* 
 cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
 
     cv::Mat vectors;    // Calculated flow vectors
@@ -130,29 +128,22 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
 
     if( distance != 0 ){
 
-        /*  this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
+        this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
         this->velocity.x = this->compute_velocity( this->flow.x, gray.rows, distance );
 
-        return this->velocity; */
+        return this->velocity;
     }
 
     return this->flow;
 
-}
+}*/
 
 
-cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float distance ){
-
+cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
     cv::Mat gray; // Output image for processing
-    
-    /* if (status.empty()) {
-		status.resize(100, 2); // Request = 2 features = 30 
-	}*/
 
     float xsum, ysum = 0;
     int count = 0;
-
-    
 
     // Convert raw frame to scaled down grayscale
     this->process_frame( raw, gray );
@@ -193,9 +184,8 @@ cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float dis
 			pixel_variance_x = sqrt(pixel_variance_x / count);
 			pixel_variance_y = sqrt(pixel_variance_y / count);
 
-            // Now remove outliers based on standard deviation and a confidense interval of 80%
-
-            float z_multiplier = 1.65; // 90% confidense interval
+            // Now remove outliers based on standard deviation and a confidense interval of 90%
+            float z_multiplier = 1.65; // 90% confidense interval 
 
             float xsum_confidense = 0;
             float ysum_confidense = 0;
@@ -249,9 +239,7 @@ cv::Point2f OpticalFlow::compute_flow_features( cv::Mat raw, float dt, float dis
 
         return this->velocity;
     }
-
     return this->flow;
-
 }
 
 float OpticalFlow::compute_pixel_velocity( float sum, int count, float dt ){
@@ -260,13 +248,13 @@ float OpticalFlow::compute_pixel_velocity( float sum, int count, float dt ){
 }
 
 float OpticalFlow::compute_velocity( float flow, int axis_length, float distance ){
+    // Find focal length in pixels 
+    int focal_length_px = (axis_length/2) / tan( this->fov/2 );
 
-    int center_distance = axis_length/2;
-
-    float pixel_per_length = (center_distance / (float)distance);
+    // Scaling factor
+    float pixel_per_length = (focal_length_px / (float)distance);
 
     return (flow / pixel_per_length);
-
 }
 
 cv::Mat OpticalFlow::get_frame( void ){
