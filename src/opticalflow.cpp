@@ -248,9 +248,9 @@ float OpticalFlow::compute_velocity( float flow, int axis_length, float distance
     int focal_length_px = (axis_length/2) / tan( this->fov/2 );
 
     // Scaling factor
-    float pixel_per_length = (focal_length_px / (float)distance);
+    float pixel_per_length = (float)distance / focal_length_px;
 
-    return (flow / pixel_per_length);
+    return flow * pixel_per_length;
 }
 
 cv::Mat OpticalFlow::get_frame( void ){
@@ -259,4 +259,8 @@ cv::Mat OpticalFlow::get_frame( void ){
 
 cv::Size OpticalFlow::get_size( void ){
     return this->size;
+}
+
+cv::Point2f OpticalFlow::get_flow( void ){
+    return this->flow;
 }

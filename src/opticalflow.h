@@ -27,6 +27,8 @@ public:
 
     cv::Mat get_frame( void );
 
+    cv::Point2f get_flow( void );
+
     cv::Size get_size( void );
 
 private:
