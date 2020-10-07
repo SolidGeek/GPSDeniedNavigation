@@ -33,7 +33,7 @@ int main( int argc, char** argv )
     // cv::VideoCapture camera;
     cv::VideoCapture video("video.avi");
     cv::Mat frame;
-    cv::Point2f velocity;
+    cv::Point2f pixels;
     float xvel = 0;
     float yvel = 0;
     float beta = 0;
@@ -72,14 +72,10 @@ int main( int argc, char** argv )
 
         float dt = time_passed();
         // Process frame using opencv
-        velocity = flowsense.compute_sparse_flow(frame, dt);
+        pixels = flowsense.compute_sparse_flow(frame);
 
-        log << framecount << ';' << velocity.x << ';' << velocity.y << std::endl;
+        log << framecount << ';' << pixels.x << ';' << pixels.y << std::endl;
         framecount++;
-
-        if(framecount == 15401){
-            break;
-        }
 
         /* float sigma = 0.2;
         xvel = (sigma * velocity.x) + (1.0 - sigma) * xvel;

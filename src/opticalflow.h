@@ -21,13 +21,15 @@ public:
     /**
      * Calculate pixel flow and convert to velocity (m/s) if distance is supplied
     */
-    cv::Point2f compute_dense_flow( cv::Mat frame, float dt, float distance = 0 );
+    cv::Point2f compute_dense_flow( cv::Mat frame, float dt = 0, float distance = 0 );
 
-    cv::Point2f compute_sparse_flow( cv::Mat raw, float dt, float distance = 0 ); 
+    cv::Point2f compute_sparse_flow( cv::Mat raw, float dt = 0, float distance = 0 ); 
 
     cv::Mat get_frame( void );
 
     cv::Point2f get_flow( void );
+
+    cv::Point2f get_average( void );
 
     cv::Size get_size( void );
 
@@ -40,6 +42,7 @@ private:
     cv::Mat frame;
     cv::Mat prev_gray;
     cv::Size size;
+    cv::Point2f average;
     cv::Point2f flow;
     cv::Point2f velocity;
 

@@ -204,8 +204,8 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
 						ysum_confidense += val_y;
 
                         // Visualize the flow in the frame
-                        cv::line(this->frame, cv::Point(features_previous[i].x,features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255, 255, 255) );
-                        cv::circle(this->frame, cv::Point(features_current[i].x,features_current[i].y), 2, cv::Scalar(255, 255, 255), -1 );
+                        cv::line(this->frame, cv::Point(features_previous[i].x, features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255, 255, 255) );
+                        cv::circle(this->frame, cv::Point(features_current[i].x, features_current[i].y), 2, cv::Scalar(255, 255, 255), -1 );
 
 						count_confidense++; 
 					} 
@@ -219,8 +219,13 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
                 count = count_confidense;
             }
             
-            this->flow.x = this->compute_pixel_velocity( xsum, count, dt);
-            this->flow.y = this->compute_pixel_velocity( ysum, count, dt);
+            this->average.x = (xsum / (float)count);
+            this->average.y = (ysum / (float)count);
+            
+            if( dt != 0 ){
+                this->flow.x = this->compute_pixel_velocity( xsum, count, dt);
+                this->flow.y = this->compute_pixel_velocity( ysum, count, dt);
+            }
         }
 	}
 
@@ -235,7 +240,13 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
 
         return this->velocity;
     }
-    return this->flow;
+    if( dt != 0)
+        return this->flow;
+    else
+        return this->average;
+    
+    return cv::Point2f(0,0);
+    
 }
 
 float OpticalFlow::compute_pixel_velocity( float sum, int count, float dt ){
@@ -263,4 +274,8 @@ cv::Size OpticalFlow::get_size( void ){
 
 cv::Point2f OpticalFlow::get_flow( void ){
     return this->flow;
+}
+
+cv::Point2f OpticalFlow::get_average( void ){
+    return this->average;
 }
