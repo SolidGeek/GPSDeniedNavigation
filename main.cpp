@@ -74,8 +74,8 @@ int main( int argc, char** argv )
         // Process frame using opencv
         pixels = flowsense.compute_sparse_flow(frame);
 
-        log << framecount << ';' << pixels.x << ';' << pixels.y << std::endl;
-        framecount++;
+        // log << framecount << ';' << pixels.x << ';' << pixels.y << std::endl;
+        // framecount++;
 
         /* float sigma = 0.2;
         xvel = (sigma * velocity.x) + (1.0 - sigma) * xvel;
