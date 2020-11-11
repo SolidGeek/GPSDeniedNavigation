@@ -1,111 +1,36 @@
 #include <iostream>
-#include <chrono>
-#include <opencv2/opencv.hpp>
-#include "src/opticalflow.h"
-#include <fstream>
+#include <string>
+#include "serial.h"
+#include "mavlink/include/c_library_v2/common/mavlink.h"
 
-float time_passed(){
-    static std::chrono::_V2::system_clock::time_point last_time;
-    std::chrono::_V2::system_clock::time_point current_time;
-    std::chrono::duration<float> delta_time;
+Serial uart(B115200);
 
-    // Get current time
-    current_time = std::chrono::high_resolution_clock::now();
-    
-    // Calculate time passed
-    delta_time = current_time - last_time;
-
-    // Save current time for next time
-    last_time = current_time;
-
-    return delta_time.count();
-}
-
-int main( int argc, char** argv )
+int main()
 {
-    // Settings
-    const int camera_id = 0;
-    const int scaledown   = 1;
-    const int interval    = 40; // 
-    const float fov       = 64; // Field of view
 
-    // Params
-    // cv::VideoCapture camera;
-    cv::VideoCapture video("video.avi");
-    cv::Mat frame;
-    cv::Point2f pixels;
-    float xvel = 0;
-    float yvel = 0;
-    float beta = 0;
-    int width  = 0;
-    int height = 0;
-    float xpos = 0;
-    float ypos = 0;
-    
-    // Open camera feed
-    /* camera.open(camera_id, cv::CAP_ANY);
-    if (!camera.isOpened()) {
-        return -1;
-    }*/
+    mavlink_status_t status;
+    mavlink_message_t msg;
+    int ch = MAVLINK_COMM_0;
 
-    // Get feed size
-    width   = video.get(cv::CAP_PROP_FRAME_WIDTH);
-    height  = video.get(cv::CAP_PROP_FRAME_HEIGHT);
+    mavlink_highres_imu_t imu;
 
-    // Initiate an OpticalFlow object 
-    OpticalFlow flowsense( width, height, scaledown, interval, fov );
+    while (true) {
 
-    std::ofstream log;
-    log.open ("log.csv");
+        unsigned char byte;
 
-    int framecount = 0;
+        if(uart.read_char( &byte )){
+            if( mavlink_parse_char( ch, byte, &msg, &status ) ){
 
-    while (1) {
-        // Read frame from camera
-        video.read(frame);
+                switch( msg.msgid ){
+                    case MAVLINK_MSG_ID_HIGHRES_IMU:
+                        mavlink_msg_highres_imu_decode(&msg, &imu);
 
-        // check if we succeeded
-        if (frame.empty()) {
-            printf("Empty frame");
-            break;
+                        std::cout << "gx: " << imu.xgyro << " gy:" << imu.ygyro << " gz:" <<imu.zgyro << std::endl;
+                    break;
+                }
+            }
         }
-
-        float dt = time_passed();
-        // Process frame using opencv
-        pixels = flowsense.compute_sparse_flow(frame);
-
-        // log << framecount << ';' << pixels.x << ';' << pixels.y << std::endl;
-        // framecount++;
-
-        /* float sigma = 0.2;
-        xvel = (sigma * velocity.x) + (1.0 - sigma) * xvel;
-        yvel = (sigma * velocity.y) + (1.0 - sigma) * yvel;
-
-        //  Calcualte moved distance
-        xpos += xvel * dt;
-        ypos += yvel * dt;
-
-        // Calculate side-slipe angle
-        if( abs(xvel) > 0.05 || abs(yvel) > 0.05 ){
-            beta = atan2(yvel, xvel)*180.0/M_PI;
-        }else{
-            beta = 0.0f;
-        }
-        
-        cv::Point2f flow = flowsense.get_flow();
-
-        printf("x%+.3f y%+.3f px/s \n", flow.x, flow.y ); */
-
-        // printf("x%+.3f y%+.3f m/s \n", xvel, yvel );
-        // printf("x%+.3f y%+.3f m \n", xpos, ypos );
-        // printf("Slide-slip angle: %.0f deg \n", beta);
-        // printf("Time passed: %.4f s", dt);
-
-        // Show live feed
-        cv::imshow("Camera feed sparse", flowsense.get_frame() );
-        
-        if (cv::waitKey(10) >= 0)
-            break;
     }
+
     return 0;
 }
