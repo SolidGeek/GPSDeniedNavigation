@@ -1,12 +1,24 @@
 #include <iostream>
 #include <string>
+#include <chrono>
+#include <fstream>
 #include "serial.h"
-#include "mavlink/include/c_library_v2/common/mavlink.h"
+#include "mavlink.h"
+#include <time.h>
 
 Serial uart(B115200);
 
+uint32_t get_time() {
+
+    struct timespec now;
+    clock_gettime(CLOCK_BOOTTIME, &now);
+
+    return (now.tv_sec*1000 + now.tv_nsec/1.0e6);
+}
+
 int main()
 {
+    uint32_t last;
 
     mavlink_status_t status;
     mavlink_message_t msg;
@@ -25,7 +37,11 @@ int main()
                     case MAVLINK_MSG_ID_HIGHRES_IMU:
                         mavlink_msg_highres_imu_decode(&msg, &imu);
 
-                        std::cout << "gx: " << imu.xgyro << " gy:" << imu.ygyro << " gz:" <<imu.zgyro << std::endl;
+                        float freq = (float)(get_time() - last)/1000.0;
+
+                        printf("%+.3f \n", freq);
+
+                        last = get_time();
                     break;
                 }
             }
