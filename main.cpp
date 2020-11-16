@@ -2,12 +2,14 @@
 #include <string>
 #include <time.h>
 #include "serial.h"
+#include "camera.h"
 #include "telemetry.h"
 
 // Init of serial port
 Serial uart(B115200);
 
 Telemetry tlm;
+Camera cam;
 
 uint32_t last_time;
 
@@ -21,6 +23,10 @@ uint32_t get_time() {
 
 int main()
 {
+
+    cam.config( 640, 480 );
+    cam.stream();
+    /*
     while (true) {
         uint8_t byte;
         uint32_t msgid;
@@ -39,6 +45,6 @@ int main()
 
             }
         }
-    }
+    }*/
     return 0;
 }

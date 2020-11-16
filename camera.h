@@ -7,10 +7,11 @@ class Camera
 {
 public:
 
-    Camera( int index, int method = cv::CAP_V4L2);
+    Camera( int index, int method = cv::CAP_V4L2, int scale = 1);
 
     bool read();
-    void config();
+    void stream();
+    void config( int width, int height );
 
     int height;
     int width;

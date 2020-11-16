@@ -4,7 +4,7 @@ CONFIG += c++11 console
 CONFIG -= app_bundle
 
 #openCV
-INCLUDEPATH += /usr/local/include/opencv2 \
+INCLUDEPATH += /usr/local/include/opencv4 \
     mavlink/include/c_library_v2/common
 
 LIBS += -L/usr/local/lib/aarch64-linux-gnu
