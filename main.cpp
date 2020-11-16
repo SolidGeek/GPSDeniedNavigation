@@ -1,52 +1,44 @@
 #include <iostream>
 #include <string>
-#include <chrono>
-#include <fstream>
-#include "serial.h"
-#include "mavlink.h"
 #include <time.h>
+#include "serial.h"
+#include "telemetry.h"
 
+// Init of serial port
 Serial uart(B115200);
+
+Telemetry tlm;
+
+uint32_t last_time;
 
 uint32_t get_time() {
 
     struct timespec now;
-    clock_gettime(CLOCK_BOOTTIME, &now);
+    clock_gettime(CLOCK_MONOTONIC, &now);
 
     return (now.tv_sec*1000 + now.tv_nsec/1.0e6);
 }
 
 int main()
 {
-    uint32_t last;
-
-    mavlink_status_t status;
-    mavlink_message_t msg;
-    int ch = MAVLINK_COMM_0;
-
-    mavlink_highres_imu_t imu;
-
     while (true) {
+        uint8_t byte;
+        uint32_t msgid;
 
-        unsigned char byte;
+        if( uart.read_char( &byte ) ){
 
-        if(uart.read_char( &byte )){
-            if( mavlink_parse_char( ch, byte, &msg, &status ) ){
+            msgid = tlm.process( byte );
 
-                switch( msg.msgid ){
-                    case MAVLINK_MSG_ID_HIGHRES_IMU:
-                        mavlink_msg_highres_imu_decode(&msg, &imu);
+            switch( msgid ){
 
-                        float freq = (float)(get_time() - last)/1000.0;
+                case MAVLINK_MSG_ID_HIGHRES_IMU:
+                    float dt = (float)(get_time()-last_time)/1000.0;
+                    printf("dt:%.3f gx:%+.4f \n", dt, tlm.data.imu.xgyro);
+                    last_time = get_time();
+                break;
 
-                        printf("%+.3f \n", freq);
-
-                        last = get_time();
-                    break;
-                }
             }
         }
     }
-
     return 0;
 }

@@ -18,7 +18,7 @@ public:
     Serial( int baud = B115200 );
 
     bool read_char( unsigned char * c );
-    bool read_chars( unsigned char * buf, int len );
+    int read_chars( unsigned char * buf, int maxlen );
 
 private:
 

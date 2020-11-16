@@ -21,6 +21,10 @@ LIBS += -lopencv_cudafilters
 
 #Project
 SOURCES += main.cpp \
-    serial.cpp
+    serial.cpp \
+    camera.cpp \
+    telemetry.cpp
 
-HEADERS += serial.h
+HEADERS += serial.h \
+    camera.h \
+    telemetry.h

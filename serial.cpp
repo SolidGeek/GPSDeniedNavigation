@@ -1,8 +1,8 @@
 #include "serial.h"
 
-Serial::Serial( int baud ){
-
-    port_id = open("/dev/ttyTHS1", O_RDONLY);
+Serial::Serial( int baud )
+{
+    port_id = open("/dev/ttyTHS1", O_RDONLY );
 
     if (port_id < 0) {
         printf("Error %i from open: %s\n", errno, strerror(errno));
@@ -24,7 +24,8 @@ Serial::Serial( int baud ){
     port_settings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);    // Non Cannonical mode
     port_settings.c_oflag &= ~OPOST;                             // No Output Processing
     port_settings.c_lflag = 0;                                   // Enable raw input instead of canonical,
-
+    port_settings.c_cc[VMIN]  = 1;                               // Read at least 1 character
+    port_settings.c_cc[VTIME] = 0;                               // Wait indefinetly
     // Set baudrate
     cfsetospeed(&port_settings, baud );
 
@@ -35,25 +36,18 @@ Serial::Serial( int baud ){
 
     // Flush buffer
     tcflush(port_id, TCIFLUSH);
-
 }
 
 
-bool Serial::read_char( unsigned char * c ){
-
+bool Serial::read_char( uint8_t * c )
+{
     if( read( port_id, c, 1) != -1 ){
         return true;
     }
-
     return false;
-
 }
 
-bool Serial::read_chars( unsigned char * buf, int len ){
-
-    if( read( port_id, buf, len ) != -1 ){
-        return true;
-    }
-
-    return false;
+int Serial::read_chars( uint8_t * buf, int maxlen )
+{
+    return read( port_id, buf, maxlen );
 }
