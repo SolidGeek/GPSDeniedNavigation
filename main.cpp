@@ -6,9 +6,9 @@
 #include "telemetry.h"
 
 // Init of serial port
-Serial uart(B115200);
+// Serial uart(B115200);
 
-Telemetry tlm;
+// Telemetry tlm;
 Camera cam;
 
 uint32_t last_time;

@@ -3,11 +3,13 @@
 
 #include <opencv2/opencv.hpp>
 
+#define CAMERA_ID_MAIN 0
+
 class Camera
 {
 public:
 
-    Camera( int index, int method = cv::CAP_V4L2, int scale = 1);
+    Camera( int index = CAMERA_ID_MAIN, int method = cv::CAP_V4L2 );
 
     bool read();
     void stream();
