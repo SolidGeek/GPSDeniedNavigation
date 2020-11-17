@@ -38,6 +38,19 @@ bool Camera::read()
     if (frame.empty())
         return false;
 
+    // Convert to RGB
+    cv::cvtColor(frame,frame, cv::COLOR_BayerGR2RGB);
+    cv::convertScaleAbs(frame, frame, 0.25, 0);
+
+    return true;
+}
+
+bool Camera::show( cv::Mat frame ){
+    cv::imshow("Camera feed sparse", frame );
+
+    if (cv::waitKey(10) >= 0)
+        return false;
+
     return true;
 }
 
@@ -45,9 +58,6 @@ bool Camera::stream(){
     if( ! read() ){
         printf("No frame \n");
     }
-
-    cv::cvtColor(frame,frame, cv::COLOR_BayerGR2RGB);
-    cv::convertScaleAbs(frame, frame, 0.25, 0);
 
     cv::imshow("Camera feed sparse", frame );
 

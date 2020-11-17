@@ -1,11 +1,11 @@
 /**
- * featureTracker.cpp
+ * feature_tracker.cpp
  *
  * Created on: September 17, 2020
  * Author: SolidGeek
  */
 
-#include "featureTracker.h"
+#include "feature_tracker.h"
 
 bool compare_keypoints(const cv::KeyPoint &first, const cv::KeyPoint &second) {
     return first.response > second.response;

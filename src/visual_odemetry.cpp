@@ -1,26 +1,30 @@
-#include "opticalflow.h"
+#include "visual_odemetry.h"
 
 
-OpticalFlow::OpticalFlow( int frame_width, int frame_height, int scaledown, int interval, float fov )
+VisualOdemetry::VisualOdemetry(  )
 {
+    // Nothing
+}
+
+void VisualOdemetry::config( int frame_width, int frame_height, int scaledown, int interval ){
+
     int scale_width = frame_width/scaledown;
     int scale_height = frame_height/scaledown;
 
     // Calculate scaled size
     this->size = cv::Size(scale_width, scale_height);
     this->interval = interval;
-    this->fov = fov * M_PI / 180.0; // Convert fov angle to radians 
 
     int features_count = (scale_width * scale_height)/pow(interval, 2);
 
-    printf("Scaled frame size is: %d x %d px (width x height) \n", scale_width, scale_height);
-    printf("Tracking %d No. of points for sparse method \n", features_count);
-
     // Initialize feature tracker
     this->tracker = new FeatureTracker( this->status, features_count );
+
+    printf("Scaled frame size is: %d x %d px (width x height) \n", scale_width, scale_height);
+    printf("Tracking %d No. of points for sparse method \n", features_count);
 }
 
-void OpticalFlow::process_frame( cv::Mat raw, cv::Mat &output ){
+void VisualOdemetry::process_frame( cv::Mat raw, cv::Mat &output ){
     // Resize the frame to specified size
     cv::resize(raw, this->frame, this->size);
 
@@ -28,13 +32,12 @@ void OpticalFlow::process_frame( cv::Mat raw, cv::Mat &output ){
     cv::cvtColor(this->frame, output, cv::COLOR_BGR2GRAY);
 }
 
-cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distance )
+cv::Point2f VisualOdemetry::compute_dense_flow( cv::Mat raw, float dt, float distance )
 {
     cv::Mat vectors;    // Calculated flow vectors
     cv::Mat gray;       // Output image for processing
 
     float xsum, ysum = 0;
-    float xflow, yflow;
     int count = 0;
 
     // Convert raw frame to scaled down grayscale
@@ -81,65 +84,7 @@ cv::Point2f OpticalFlow::compute_dense_flow( cv::Mat raw, float dt, float distan
     return this->flow;
 }
 
-/* 
-cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
-
-    cv::Mat vectors;    // Calculated flow vectors
-    cv::Mat gray;       // Output image for processing
-    std::vector<uchar> status;
-    std::vector<float> errors;
-
-    float xsum, ysum = 0;
-    float xflow, yflow;
-    int count = 0;
-
-    // Convert raw frame to scaled down grayscale
-    this->process_frame( raw, gray );
-
-    if( !this->prev_gray.empty() ){
-
-        cv::calcOpticalFlowPyrLK( this->prev_gray, gray, this->grid, vectors, status, errors, cv::Size(21, 21), 3 );
-        this->grid = vectors;
-
-        for (int y = 0; y < vectors.rows; y++)
-        {
-            for (int x = 0; x < vectors.cols; x++)
-            {
-                cv::Point2f start   = grid.at<cv::Point2f>(y,x);
-                cv::Point2f end     = vectors.at<cv::Point2f>(y,x);
-       
-                if( status[count] == 1 ){
-                    
-                    if( errors[count] < 2.5f )
-                        // printf( "%.2f", errors[count] );
-                        // Visualize the flow in the frame
-                        cv::line(this->frame, start, end, cv::Scalar(0, 255, 0) );
-                }
-                
-                cv::circle(this->frame, start, 1, cv::Scalar(0, 255, 0) );
-
-                count++;
-            }
-        }
-
-    }
-
-    this->prev_gray = gray;
-
-    if( distance != 0 ){
-
-        this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
-        this->velocity.x = this->compute_velocity( this->flow.x, gray.rows, distance );
-
-        return this->velocity;
-    }
-
-    return this->flow;
-
-}*/
-
-
-cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
+cv::Point2f VisualOdemetry::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
     cv::Mat gray; // Output image for processing
 
     float xsum, ysum = 0;
@@ -249,12 +194,12 @@ cv::Point2f OpticalFlow::compute_sparse_flow( cv::Mat raw, float dt, float dista
     
 }
 
-float OpticalFlow::compute_pixel_velocity( float sum, int count, float dt ){
+float VisualOdemetry::compute_pixel_velocity( float sum, int count, float dt ){
     // Calculate pixels per second
     return (sum / (float)count) / dt;
 }
 
-float OpticalFlow::compute_velocity( float flow, int axis_length, float distance ){
+float VisualOdemetry::compute_velocity( float flow, int axis_length, float distance ){
     // Find focal length in pixels 
     int focal_length_px = (axis_length/2) / tan( this->fov/2 );
 
@@ -264,18 +209,18 @@ float OpticalFlow::compute_velocity( float flow, int axis_length, float distance
     return flow * pixel_per_length;
 }
 
-cv::Mat OpticalFlow::get_frame( void ){
+cv::Mat VisualOdemetry::get_frame( void ){
     return this->frame;
 }
 
-cv::Size OpticalFlow::get_size( void ){
+cv::Size VisualOdemetry::get_size( void ){
     return this->size;
 }
 
-cv::Point2f OpticalFlow::get_flow( void ){
+cv::Point2f VisualOdemetry::get_flow( void ){
     return this->flow;
 }
 
-cv::Point2f OpticalFlow::get_average( void ){
+cv::Point2f VisualOdemetry::get_average( void ){
     return this->average;
 }

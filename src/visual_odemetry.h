@@ -4,11 +4,11 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <ctype.h>
-#include "featureTracker.h"
+#include "feature_tracker.h"
 
 #define M_PI 3.14159265358979323846
 
-class OpticalFlow
+class VisualOdemetry
 {
 
 public:
@@ -16,7 +16,9 @@ public:
     /**
      * Constructor
     */
-    OpticalFlow( int frame_width, int frame_height, int scaledown = 1, int interval = 16, float fov = 64.0 );
+    VisualOdemetry();
+
+    void config(int frame_width, int frame_height, int scaledown = 1, int interval = 16 );
 
     /**
      * Calculate pixel flow and convert to velocity (m/s) if distance is supplied

@@ -1,5 +1,5 @@
 /**
- * featureTracker.h
+ * feature_tracker.h
  *
  * Created on: September 17, 2020
  * Author: SolidGeek

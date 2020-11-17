@@ -5,26 +5,32 @@ CONFIG -= app_bundle
 
 #openCV
 INCLUDEPATH += /usr/local/include/opencv4 \
-    mavlink/include/c_library_v2/common
+    mavlink/include/c_library_v2/common \
+    src \
 
 LIBS += -L/usr/local/lib/aarch64-linux-gnu
 LIBS += -lopencv_core
-LIBS += -lopencv_dnn
+LIBS += -lopencv_highgui
 LIBS += -lopencv_imgproc
 LIBS += -lopencv_imgcodecs
-LIBS += -lopencv_highgui
+LIBS += -lopencv_video
+LIBS += -lopencv_features2d
+LIBS += -lopencv_dnn
+
+
 LIBS += -lopencv_videoio
-LIBS += -lopencv_cudaimgproc
-LIBS += -lopencv_cudawarping
-LIBS += -lopencv_cudaarithm
-LIBS += -lopencv_cudafilters
+
 
 #Project
 SOURCES += main.cpp \
     serial.cpp \
     camera.cpp \
-    telemetry.cpp
+    telemetry.cpp \
+    src/feature_tracker.cpp \
+    src/visual_odemetry.cpp
 
 HEADERS += serial.h \
     camera.h \
-    telemetry.h
+    telemetry.h \
+    src/feature_tracker.h \
+    src/visual_odemetry.h \

@@ -13,6 +13,7 @@ public:
 
     bool read();
     bool stream();
+    bool show( cv::Mat frame );
     void config( int width, int height );
     void stop();
 
