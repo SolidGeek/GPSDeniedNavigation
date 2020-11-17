@@ -12,8 +12,9 @@ public:
     Camera( int index = CAMERA_ID_MAIN, int method = cv::CAP_V4L2 );
 
     bool read();
-    void stream();
+    bool stream();
     void config( int width, int height );
+    void stop();
 
     int height;
     int width;

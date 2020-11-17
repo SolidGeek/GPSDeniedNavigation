@@ -41,22 +41,24 @@ bool Camera::read()
     return true;
 }
 
-void Camera::stream(){
-    while(1){
-
-        if( ! read() ){
-            printf("No frame \n");
-        }
-
-        cv::cvtColor(frame,frame, cv::COLOR_BayerGR2RGB);
-        cv::convertScaleAbs(frame, frame, 0.25, 0);
-
-        cv::imshow("Camera feed sparse", frame );
-
-        if (cv::waitKey(10) >= 0)
-            break;
+bool Camera::stream(){
+    if( ! read() ){
+        printf("No frame \n");
     }
-    camera.release();
+
+    cv::cvtColor(frame,frame, cv::COLOR_BayerGR2RGB);
+    cv::convertScaleAbs(frame, frame, 0.25, 0);
+
+    cv::imshow("Camera feed sparse", frame );
+
+    if (cv::waitKey(10) >= 0)
+        return false;
+
+    return true;
 }
 
+void Camera::stop()
+{
+    camera.release();
+}
 
