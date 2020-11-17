@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 #include <string>
 #include <time.h>
 #include "serial.h"
@@ -8,8 +9,10 @@
 // Init of serial port
 // Serial uart(B115200);
 
+Serial usb("/dev/ttyUSB0", SERIAL_WRITE);
+
 // Telemetry tlm;
-Camera cam;
+// Camera cam;
 
 uint32_t last_time;
 
@@ -24,8 +27,19 @@ uint32_t get_time() {
 int main()
 {
 
-    cam.config( 640, 480 );
-    cam.stream();
+    // cam.config( 640, 480 );
+    // cam.stream();
+
+    usb.setup( SERIAL_TYPE_USB, B115200 );
+
+    while(true){
+
+        usb.write_string("A10 \n");
+        usleep(100000);
+
+    }
+
+
     /*
     while (true) {
         uint8_t byte;

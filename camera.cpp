@@ -4,11 +4,11 @@ Camera::Camera( int index, int method )
 {
     printf("Opening camera \n");
     camera.open( index , method );
-    camera.set(cv::CAP_PROP_CONVERT_RGB, 0);
 
-    printf("Reading properties \n");
-    width  = camera.get(cv::CAP_PROP_FRAME_WIDTH);
-    height = camera.get(cv::CAP_PROP_FRAME_HEIGHT);
+
+
+    // width  = camera.get(cv::CAP_PROP_FRAME_WIDTH);
+    //height = camera.get(cv::CAP_PROP_FRAME_HEIGHT);
 }
 
 void Camera::config( int _width, int _height )
@@ -17,13 +17,18 @@ void Camera::config( int _width, int _height )
     height = _height;
 
     printf("Setting properties \n");
-    camera.set(cv::CAP_PROP_BUFFERSIZE, 1);
+
+
+    //camera.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('Y','1','6',' '));
+    camera.set(cv::CAP_PROP_CONVERT_RGB, false);
+
+    // camera.set(cv::CAP_PROP_BUFFERSIZE, 1);
     camera.set(cv::CAP_PROP_FRAME_WIDTH, width);    // 640
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, height);  // 480
 
     // force initial exposure to avoid orange hue
     camera.read(frame);
-    // system("v4l2-ctl -c exposure=100");
+    system("v4l2-ctl -c exposure=2000");
 
 }
 

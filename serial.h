@@ -11,14 +11,28 @@
 #include <string>
 #include <cstring>
 
+#define SERIAL_TYPE_THS 0
+#define SERIAL_TYPE_USB 1
+
+#define SERIAL_READ  O_RDONLY
+#define SERIAL_WRITE O_WRONLY
+#define SERIAL_READWRITE O_RDWR
+
 class Serial{
 
 public:
 
-    Serial( int baud = B115200 );
+    Serial( const char* device, int method = SERIAL_READ );
 
-    bool read_char( unsigned char * c );
-    int read_chars( unsigned char * buf, int maxlen );
+
+    void setup( int type, int baud = B115200 );
+
+    bool read_char( uint8_t * c );
+    int read_chars( uint8_t * buf, int maxlen );
+
+    void write_chars( const uint8_t *c, int len );
+
+    void write_string( const char * str );
 
 private:
 
