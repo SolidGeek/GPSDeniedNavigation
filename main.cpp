@@ -14,7 +14,7 @@
 // Init of serial port
 // Serial uart(B115200);
 
-Serial usb("/dev/ttyUSB0", SERIAL_WRITE);
+// Serial usb("/dev/ttyUSB0", SERIAL_WRITE);
 
 // Telemetry tlm;
 Camera cam;
@@ -43,7 +43,7 @@ int main()
 
     cam.config( IMAGE_WIDTH, IMAGE_HEIGHT );
     vo.config( IMAGE_WIDTH, IMAGE_HEIGHT);
-    usb.setup( SERIAL_TYPE_USB, B115200 );
+    // usb.setup( SERIAL_TYPE_USB, B115200 );
 
     while( streaming ){
 
