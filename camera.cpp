@@ -28,11 +28,13 @@ void Camera::config( int _width, int _height )
     // camera.set(cv::CAP_PROP_BUFFERSIZE, 1);
     camera.set(cv::CAP_PROP_FRAME_WIDTH, width);    // 640
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, height);  // 480
+    camera.set(cv::CAP_PROP_SETTINGS, 0);
+    //camera.set(cv::CAP_PROP_EXPOSURE, 100);
 
     // force initial exposure to avoid orange hue
     // camera.read(frame);
-    //system("v4l2-ctl -c exposure=2000");
-    system("v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=0");
+    // system("v4l2-ctl -c exposure=10000");
+    //system("v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=0");
 }
 
 bool Camera::read()
