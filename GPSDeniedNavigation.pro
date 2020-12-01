@@ -27,10 +27,12 @@ SOURCES += main.cpp \
     camera.cpp \
     telemetry.cpp \
     src/feature_tracker.cpp \
-    src/visual_odemetry.cpp
+    src/visual_odemetry.cpp \
+    timing.cpp
 
 HEADERS += serial.h \
     camera.h \
     telemetry.h \
     src/feature_tracker.h \
     src/visual_odemetry.h \
+    timing.h

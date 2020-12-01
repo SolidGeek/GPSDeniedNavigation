@@ -1,33 +1,20 @@
 #include <iostream>
 #include <unistd.h>
 #include <string>
-#include <time.h>
+#include "timing.h"
 #include "serial.h"
 #include "camera.h"
 #include "telemetry.h"
 #include "visual_odemetry.h"
+
 #include <math.h>
+#include <thread>
 
-#include <stack>
-#include <ctime>
-
-std::stack<clock_t> tictoc_stack;
-
-void tic() {
-    tictoc_stack.push(clock());
-}
-
-void toc() {
-    std::cout << "Time elapsed: "
-              << ((double)(clock() - tictoc_stack.top())) / CLOCKS_PER_SEC
-              << std::endl;
-    tictoc_stack.pop();
-}
 
 #define IMAGE_WIDTH 640
 #define IMAGE_HEIGHT 480
 
-#define CAMERA_SAMPLE_TIME 2.5e4 // in us, given a rate of 50 Hz
+#define CAMERA_SAMPLE_TIME 3.333e4 // in us, given a rate of 30 Hz
 
 // Init of serial port
 Serial px4_uart("/dev/ttyTHS1", SERIAL_READ);
@@ -43,46 +30,77 @@ uint32_t last_time_quat;
 uint32_t last_time_imu;
 uint32_t last_time_pos;
 uint32_t last_time_cam;
-bool streaming = true;
+
 cv::Point2f velocity;
 
+// For mavlink packages
 uint8_t byte;
 uint32_t msgid;
-char buf[10] = {'\0'};
-uint8_t receive_buf[100];
 
+// For uart communication
+char write_buf[10];
 
+float pos_x = 300;
+float pos_y = 300;
 
-uint32_t micros(){
+// Data from mavlink
+float qw = 0, qx = 0, qy = 0, qz = 0, roll = 0, yaw = 0;
 
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
+cv::Mat map = cv::Mat::zeros(cv::Size(600,600),CV_8UC1);
 
-    static uint32_t start_time = 0;
-
-    if( start_time == 0 ){
-        start_time = (now.tv_sec*1e6 + now.tv_nsec/1e3);
-    }
-
-    uint32_t now_time = (now.tv_sec*1e6 + now.tv_nsec/1e3);
-
-    return now_time - start_time;
-
-}
-
-int main()
-{
-    cam.config( IMAGE_WIDTH, IMAGE_HEIGHT );
-    vo.config( IMAGE_WIDTH, IMAGE_HEIGHT, 2, 16);
-    // usb.setup( SERIAL_TYPE_USB, B115200 );
+void mavlink_thread(){
 
     px4_uart.setup( SERIAL_TYPE_THS, B115200 );
-    // servo_uart.setup( SERIAL_TYPE_USB, B115200);
 
+    while(1){
+        if( px4_uart.read_char( &byte ) ){
 
-    while( true ){
+            msgid = tlm.process( byte );
 
-        // Sample camera
+            switch( msgid ){
+                case MAVLINK_MSG_ID_EXTENDED_SYS_STATE:
+                    printf("Heartbeat");
+                break;
+
+                case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
+
+                    qw = tlm.data.attitude.q1;
+                    qx = tlm.data.attitude.q2;
+                    qy = tlm.data.attitude.q3;
+                    qz = tlm.data.attitude.q4;
+
+                    roll = atan2( -2*(qy*qz - qx*qw), pow(qw,2) - pow(qx,2) - pow(qy,2) + pow(qz,2) );
+                    yaw = atan2( -2*(qx*qy - qz*qw), pow(qw,2) + pow(qx,2) - pow(qy,2) - pow(qz,2) );
+
+                    dt = (float)(micros()-last_time_quat)/1e6;
+                    last_time_quat = micros();
+                    //printf("Yaw: %+.4f \n", yaw);
+
+                break;
+
+                case MAVLINK_MSG_ID_HIGHRES_IMU:
+                    dt = (float)(micros()-last_time_imu)/1e6;
+                    last_time_imu = micros();
+                    //printf("IMU: %+.2f \n", 1/dt);
+                break;
+
+                case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+                    // Log position
+                break;
+            }
+        }
+    }
+}
+
+void camera_thread(){
+
+    cv::Mat display;
+
+    cam.config( IMAGE_WIDTH, IMAGE_HEIGHT );
+    vo.config( IMAGE_WIDTH, IMAGE_HEIGHT, 40 );
+
+    // Sample camera
+    while(1){
         if( micros() - last_time_cam > CAMERA_SAMPLE_TIME ){
 
             dt = (float)(micros()-last_time_cam)/1e6;
@@ -90,93 +108,57 @@ int main()
 
             cam.read();
 
-            velocity = vo.compute_sparse_flow( cam.frame);
-            cam.show( vo.get_frame() );
+            vo.compute_sparse_flow( cam.frame, dt );
 
-            printf("CAM: %+.2f \n", 1.0/dt);
+            float dN = dt * (vo.get_vel_y() * cos(yaw) - vo.get_vel_x() * sin(yaw));
+            float dE = dt * (vo.get_vel_y() * sin(yaw) + vo.get_vel_x() * cos(yaw));
 
-        }else{
-            if( px4_uart.read_char( &byte ) ){
+            pos_x += dN;
+            pos_y += dE;
 
-                msgid = tlm.process( byte );
+            cv::Point pos((int)pos_x, (int)pos_y);
+            cv::circle(map, pos, 1, cv::Scalar(255, 255, 255));
 
-                switch( msgid ){
+            display = vo.get_frame();
 
-                    case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
+            int length = 100;
+            cv::Point P1(display.cols/2,display.rows/2);
+            cv::Point P2;
 
-                        /*float qw = tlm.data.attitude.q1;
-                        float qx = tlm.data.attitude.q2;
-                        float qy = tlm.data.attitude.q3;
-                        float qz = tlm.data.attitude.q4;
+            P2.x =  (int)round(P1.x + length * cos(yaw));
+            P2.y =  (int)round(P1.y + length * sin(yaw));
+            cv::line(display, P1, P2, cv::Scalar(255, 255, 255), 2);
 
-                        float roll = atan2( -2*(qy*qz - qx*qw), pow(qw,2) - pow(qx,2) - pow(qy,2) + pow(qz,2) ) * 180.0/M_PI;*/
+            cam.show( display );
 
-                        // float yaw = atan2( -2*(qx*qy - qz*qw), pow(qw,2) + pow(qx,2) - pow(qy,2) - pow(qz,2) );
+            cv::imshow("Map", map);
 
-                        //float dt = (float)(get_time()-last_time)/1000.0;
-                        //printf("dt: %+.4f \n", 1.0/dt);
-                        //last_time = get_time();
+            printf("CAM: %+.2f X: %+.2f Y: %+.2f \n", 1.0/dt, dN, dE );
 
-                        //sprintf(buf, "A%.2f \n", roll);
-                        //printf("%s", buf);
-                        // servo_uart.write_string(buf);
-
-                        dt = (float)(micros()-last_time_quat)/1e6;
-                        last_time_quat = micros();
-                        printf("QUAT: %+.2f \n", 1.0/dt);
-
-                    break;
-
-                    case MAVLINK_MSG_ID_HIGHRES_IMU:
-
-                        dt = (float)(micros()-last_time_imu)/1e6;
-                        last_time_imu = micros();
-                        printf("IMU: %+.2f \n", 1.0/dt);
-
-                    break;
-
-                    case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-
-                        dt = (float)(micros()-last_time_pos)/1e6;
-                        last_time_pos = micros();
-                        printf("POS: %+.2f \n", 1.0/dt);
-
-                    break;
-
-
-
-                }
-            }
         }
+    }
 
+    cam.stop();
+}
+
+int main()
+{
+
+    std::thread t1( camera_thread );
+    std::thread t2( mavlink_thread );
+
+    // usb.setup( SERIAL_TYPE_USB, B115200 );
+    // servo_uart.setup( SERIAL_TYPE_USB, B115200);
+
+    // while( true ){
 
 
         // sprintf(buf, "A%.2f \n", angle);
-        // usb.write_string(buf);
-    }
+        // usb.write_string(buf); */
+    // }
 
-    // cam.stop();
+    t1.join();
+    t2.join();
 
-
-    /*
-    while (true) {
-        uint8_t byte;
-        uint32_t msgid;
-
-        if( uart.read_char( &byte ) ){
-
-            msgid = tlm.process( byte );
-
-            switch( msgid ){
-
-                case MAVLINK_MSG_ID_HIGHRES_IMU:
-                    float dt = (float)(get_time()-last_time)/1000.0;
-                    printf("dt:%.3f gx:%+.4f \n", dt, tlm.data.imu.xgyro);
-                    last_time = get_time();
-                break;
-
-            }
-        }
-    }*/
     return 0;
 }

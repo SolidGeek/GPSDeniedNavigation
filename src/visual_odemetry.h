@@ -18,52 +18,60 @@ public:
     */
     VisualOdemetry();
 
-    void config(int frame_width, int frame_height, int scaledown = 1, int interval = 16 );
+    void config( int frame_width, int frame_height, int interval = 20, float scale = 1.0 );
 
-    /**
-     * Calculate pixel flow and convert to velocity (m/s) if distance is supplied
-    */
-    cv::Point2f compute_dense_flow( cv::Mat frame, float dt = 0, float distance = 0 );
+    /*
+     * Calculate optical flow in pixels
+     */
+    void compute_dense_flow( cv::Mat frame, float dt = 0 );
 
-    cv::Point2f compute_sparse_flow( cv::Mat raw, float dt = 0, float distance = 0 ); 
+    void compute_sparse_flow( cv::Mat frame, float dt = 0 );
 
+    /*
+     * Get the frame with visualised flow
+     */
     cv::Mat get_frame( void );
 
-    cv::Point2f get_flow( void );
-
-    cv::Point2f get_average( void );
-
-    cv::Size get_size( void );
+    /*
+     * Calculate pixel velocity (px/s) and velocity (m/s) if distance is supplied
+     */
+    float get_vel_x( float distance = 0 );
+    float get_vel_y( float distance = 0 );
 
 private:
 
     FeatureTracker * tracker = NULL; 
 
-    cv::Mat grid; 
-
     cv::Mat frame;
-    cv::Mat prev_gray;
+    cv::Mat frame_gfx;
+    cv::Mat frame_prev;
+
     cv::Size size;
-    cv::Point2f average;
-    cv::Point2f flow;
-    cv::Point2f velocity;
-
-    std::vector<int> status;
-    std::vector<cv::Point2f> features_current, features_previous, features_tmp, useless;
-
     int interval;
-    float fov;
-    
+
+    float of_x;
+    float of_y;
+
+    float vo_x;
+    float vo_y;
+
+    // Parameters used for featuretracker
+    std::vector<int> status;
+    std::vector<cv::Point2f> features_current, features_previous;
+
+    /*
+     * Process the raw frame according to scale and/or color
+     */
     void process_frame( cv::Mat raw, cv::Mat &output );
     
-    /**
+    /*
      * Compute optical flow in pixels / second. Sum is the total pixel change while count is the total number of points for the frame.
     */
     float compute_pixel_velocity( float sum, int count, float dt );
 
     float compute_velocity( float flow, int axis_length, float distance );
 
-    /**
+    /*
      * Parameters for opencv's calcOpticalFlowFarneback
     */
     const float pyr_scale = 0.5;

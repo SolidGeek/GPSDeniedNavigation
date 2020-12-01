@@ -6,15 +6,15 @@ VisualOdemetry::VisualOdemetry(  )
     // Nothing
 }
 
-void VisualOdemetry::config( int frame_width, int frame_height, int scaledown, int interval ){
-
-    int scale_width = frame_width/scaledown;
-    int scale_height = frame_height/scaledown;
+void VisualOdemetry::config( int frame_width, int frame_height, int interval, float scale ){
 
     // Calculate scaled size
+    int scale_width = (float)frame_width * scale;
+    int scale_height = (float)frame_height * scale;
     this->size = cv::Size(scale_width, scale_height);
-    this->interval = interval;
 
+    // Set interval for points to track
+    this->interval = interval;
     int features_count = (scale_width * scale_height)/pow(interval, 2);
 
     // Initialize feature tracker
@@ -26,27 +26,28 @@ void VisualOdemetry::config( int frame_width, int frame_height, int scaledown, i
 
 void VisualOdemetry::process_frame( cv::Mat raw, cv::Mat &output ){
     // Resize the frame to specified size
-    cv::resize(raw, this->frame, this->size);
+    cv::resize(raw, output, this->size);
+
+    this->frame_gfx = output;
 
     // Convert to grayscale (and use this to perform flow analysis)
-    cv::cvtColor(this->frame, output, cv::COLOR_BGR2GRAY);
+    // cv::cvtColor(this->frame, output, cv::COLOR_BGR2GRAY);
 }
 
-cv::Point2f VisualOdemetry::compute_dense_flow( cv::Mat raw, float dt, float distance )
+void VisualOdemetry::compute_dense_flow( cv::Mat raw, float dt )
 {
     cv::Mat vectors;    // Calculated flow vectors
-    cv::Mat gray;       // Output image for processing
 
     float xsum, ysum = 0;
     int count = 0;
 
     // Convert raw frame to scaled down grayscale
-    this->process_frame( raw, gray );
+    this->process_frame( raw, this->frame );
     
-    if( !this->prev_gray.empty() ){
+    if( !this->frame_prev.empty() ){
 
         // Use opencv to calculate flow between new frame and previous frame
-        cv::calcOpticalFlowFarneback( this->prev_gray, gray, vectors, this->pyr_scale, this->levels, this->winsize, this->iterations, this->poly_n, this->poly_sigma, 0);
+        cv::calcOpticalFlowFarneback( this->frame_prev, this->frame, vectors, this->pyr_scale, this->levels, this->winsize, this->iterations, this->poly_n, this->poly_sigma, 0);
 
         for (int y = this->interval/2; y < vectors.rows; y+=this->interval)
         {
@@ -59,45 +60,37 @@ cv::Point2f VisualOdemetry::compute_dense_flow( cv::Mat raw, float dt, float dis
                 ysum += vector.y;
 
                 // Visualize the flow in the frame
-                cv::line(this->frame, cv::Point(x,y), cv::Point(x-int(vector.x),y-int(vector.y)), cv::Scalar(255, 255, 255) );
-                cv::circle(this->frame, cv::Point(x,y), 2, cv::Scalar(255, 255, 255), -1 );
+                cv::line(this->frame_gfx, cv::Point(x,y), cv::Point(x-int(vector.x),y-int(vector.y)), cv::Scalar(255, 255, 255) );
+                cv::circle(this->frame_gfx, cv::Point(x,y), 2, cv::Scalar(255, 255, 255), -1 );
 
                 count++;
             }
         }
 
-        // Calculate flow from sums
-        this->flow.x = this->compute_pixel_velocity( xsum, count, dt);
-        this->flow.y = this->compute_pixel_velocity( ysum, count, dt);
+        if( dt != 0 ){
+            // Calculate flow from sums
+            this->of_x = this->compute_pixel_velocity( xsum, count, dt);
+            this->of_y = this->compute_pixel_velocity( ysum, count, dt);
+        }
     }
 
-    this->prev_gray = gray;
-
-    if( distance != 0 ){
-
-        this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
-        this->velocity.y = this->compute_velocity( this->flow.y, gray.rows, distance );
-
-        return this->velocity;
-    }
-
-    return this->flow;
+    this->frame_prev = this->frame;
 }
 
-cv::Point2f VisualOdemetry::compute_sparse_flow( cv::Mat raw, float dt, float distance ){
-    cv::Mat gray; // Output image for processing
+void VisualOdemetry::compute_sparse_flow( cv::Mat raw, float dt ){
 
     float xsum, ysum = 0;
     int count = 0;
 
     // Convert raw frame to scaled down grayscale
-    this->process_frame( raw, gray );
+    this->process_frame( raw, this->frame );
 
-    // trackFeatures are made for stereo, so first two arguments is left and right image. 
-    tracker->track_features(gray, this->features_current, this->status );
+    // Track features in new frame
+    tracker->track_features(this->frame, this->features_current, this->status );
 
     if (!this->features_current.empty() && !this->features_previous.empty()) {
-		//calculate pixel flow
+
+        // Calculate pixel flow
 
 		for (int i = 0; i < this->status.size(); i++) {
 			//just use active features
@@ -149,49 +142,35 @@ cv::Point2f VisualOdemetry::compute_sparse_flow( cv::Mat raw, float dt, float di
 						ysum_confidense += val_y;
 
                         // Visualize the flow in the frame
-                        cv::line(this->frame, cv::Point(features_previous[i].x, features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255, 255, 255) );
-                        cv::circle(this->frame, cv::Point(features_current[i].x, features_current[i].y), 2, cv::Scalar(255, 255, 255), -1 );
+                        cv::line(this->frame_gfx, cv::Point(features_previous[i].x, features_previous[i].y), cv::Point(features_current[i].x, features_current[i].y), cv::Scalar(255, 255, 255) );
+                        cv::circle(this->frame_gfx, cv::Point(features_current[i].x, features_current[i].y), 2, cv::Scalar(255, 255, 255), -1 );
 
 						count_confidense++; 
 					} 
                 }
             }
-
+            // If some of the samples were inside the confidense interval
             if(count_confidense){
-                // Calculate new pixel flow
                 xsum = xsum_confidense;
                 ysum = ysum_confidense;
                 count = count_confidense;
             }
             
-            this->average.x = (xsum / (float)count);
-            this->average.y = (ysum / (float)count);
-            
             if( dt != 0 ){
-                this->flow.x = this->compute_pixel_velocity( xsum, count, dt);
-                this->flow.y = this->compute_pixel_velocity( ysum, count, dt);
+                this->of_x = this->compute_pixel_velocity( xsum, count, dt);
+                this->of_y = this->compute_pixel_velocity( ysum, count, dt);
             }
+        }else{
+            this->of_x = 0;
+            this->of_y = 0;
         }
 	}
 
     this->features_previous = this->features_current;
 
-    tracker->update_feature_status( this->status );
+    this->tracker->update_feature_status( this->status );
 
-    if( distance != 0 ){
-
-        this->velocity.x = this->compute_velocity( this->flow.x, gray.cols, distance );
-        this->velocity.y = this->compute_velocity( this->flow.y, gray.rows, distance );
-
-        return this->velocity;
-    }
-    if( dt != 0)
-        return this->flow;
-    else
-        return this->average;
-    
-    return cv::Point2f(0,0);
-    
+    this->frame_prev = this->frame;
 }
 
 float VisualOdemetry::compute_pixel_velocity( float sum, int count, float dt ){
@@ -201,7 +180,7 @@ float VisualOdemetry::compute_pixel_velocity( float sum, int count, float dt ){
 
 float VisualOdemetry::compute_velocity( float flow, int axis_length, float distance ){
     // Find focal length in pixels 
-    int focal_length_px = (axis_length/2) / tan( this->fov/2 );
+    int focal_length_px = (axis_length/2) / tan( 64.0 /2 );
 
     // Scaling factor
     float pixel_per_length = (float)distance / focal_length_px;
@@ -210,17 +189,24 @@ float VisualOdemetry::compute_velocity( float flow, int axis_length, float dista
 }
 
 cv::Mat VisualOdemetry::get_frame( void ){
-    return this->frame;
+    return this->frame_gfx;
 }
 
-cv::Size VisualOdemetry::get_size( void ){
-    return this->size;
+float VisualOdemetry::get_vel_x( float distance ){
+    if( distance != 0 ){
+        return compute_velocity( this->of_x, this->frame.cols, distance );
+    }
+
+    return of_x;
 }
 
-cv::Point2f VisualOdemetry::get_flow( void ){
-    return this->flow;
+float VisualOdemetry::get_vel_y( float distance ){
+    if( distance != 0 ){
+        return compute_velocity( this->of_y, this->frame.rows, distance );
+    }
+
+    return of_y;
 }
 
-cv::Point2f VisualOdemetry::get_average( void ){
-    return this->average;
-}
+
+
