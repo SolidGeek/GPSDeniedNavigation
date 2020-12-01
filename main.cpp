@@ -27,7 +27,7 @@ void toc() {
 #define IMAGE_WIDTH 640
 #define IMAGE_HEIGHT 480
 
-#define CAMERA_SAMPLE_TIME 2e4 // in us, given a rate of 50 Hz
+#define CAMERA_SAMPLE_TIME 2.5e4 // in us, given a rate of 50 Hz
 
 // Init of serial port
 Serial px4_uart("/dev/ttyTHS1", SERIAL_READ);
@@ -38,9 +38,11 @@ Telemetry tlm;
 Camera cam;
 VisualOdemetry vo;
 
-
-uint32_t dt;
-uint32_t last_time;
+float dt;
+uint32_t last_time_quat;
+uint32_t last_time_imu;
+uint32_t last_time_pos;
+uint32_t last_time_cam;
 bool streaming = true;
 cv::Point2f velocity;
 
@@ -50,12 +52,6 @@ char buf[10] = {'\0'};
 uint8_t receive_buf[100];
 
 
-uint32_t get_time() {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-
-    return (now.tv_sec*1000 + now.tv_nsec/1.0e6);
-}
 
 uint32_t micros(){
 
@@ -86,18 +82,19 @@ int main()
 
     while( true ){
 
-        if( micros() - last_time > CAMERA_SAMPLE_TIME ){
+        // Sample camera
+        if( micros() - last_time_cam > CAMERA_SAMPLE_TIME ){
 
-            dt = micros() - last_time;
-            last_time = micros();
+            dt = (float)(micros()-last_time_cam)/1e6;
+            last_time_cam = micros();
 
             cam.read();
 
             velocity = vo.compute_sparse_flow( cam.frame);
             cam.show( vo.get_frame() );
 
+            printf("CAM: %+.2f \n", 1.0/dt);
 
-            printf("Hz: %.2f \n", 1.0/((float)dt/1.0e6)  );
         }else{
             if( px4_uart.read_char( &byte ) ){
 
@@ -107,24 +104,46 @@ int main()
 
                     case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
 
-                        float qw = tlm.data.attitude.q1;
+                        /*float qw = tlm.data.attitude.q1;
                         float qx = tlm.data.attitude.q2;
                         float qy = tlm.data.attitude.q3;
                         float qz = tlm.data.attitude.q4;
 
-                        float roll = atan2( -2*(qy*qz - qx*qw), pow(qw,2) - pow(qx,2) - pow(qy,2) + pow(qz,2) ) * 180.0/M_PI;
+                        float roll = atan2( -2*(qy*qz - qx*qw), pow(qw,2) - pow(qx,2) - pow(qy,2) + pow(qz,2) ) * 180.0/M_PI;*/
 
                         // float yaw = atan2( -2*(qx*qy - qz*qw), pow(qw,2) + pow(qx,2) - pow(qy,2) - pow(qz,2) );
 
-                        // float dt = (float)(get_time()-last_time)/1000.0;
-                        // printf("roll: %+.4f \n", roll);
-                        // last_time = get_time();
+                        //float dt = (float)(get_time()-last_time)/1000.0;
+                        //printf("dt: %+.4f \n", 1.0/dt);
+                        //last_time = get_time();
 
-                        sprintf(buf, "A%.2f \n", roll);
-                        printf("%s", buf);
+                        //sprintf(buf, "A%.2f \n", roll);
+                        //printf("%s", buf);
                         // servo_uart.write_string(buf);
 
+                        dt = (float)(micros()-last_time_quat)/1e6;
+                        last_time_quat = micros();
+                        printf("QUAT: %+.2f \n", 1.0/dt);
+
                     break;
+
+                    case MAVLINK_MSG_ID_HIGHRES_IMU:
+
+                        dt = (float)(micros()-last_time_imu)/1e6;
+                        last_time_imu = micros();
+                        printf("IMU: %+.2f \n", 1.0/dt);
+
+                    break;
+
+                    case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+
+                        dt = (float)(micros()-last_time_pos)/1e6;
+                        last_time_pos = micros();
+                        printf("POS: %+.2f \n", 1.0/dt);
+
+                    break;
+
+
 
                 }
             }

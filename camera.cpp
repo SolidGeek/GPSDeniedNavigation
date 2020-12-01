@@ -13,28 +13,20 @@ Camera::Camera( int index, int method )
 
 void Camera::config( int _width, int _height )
 {
-
     int format = cv::VideoWriter::fourcc('G','R','E','Y');
 
     width = _width;
     height = _height;
 
     printf("Setting properties \n");
-
-
     camera.set(cv::CAP_PROP_FOURCC, format);
-    // camera.set(cv::CAP_PROP_CONVERT_RGB, false);
-
-    // camera.set(cv::CAP_PROP_BUFFERSIZE, 1);
     camera.set(cv::CAP_PROP_FRAME_WIDTH, width);    // 640
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, height);  // 480
-    camera.set(cv::CAP_PROP_SETTINGS, 0);
-    //camera.set(cv::CAP_PROP_EXPOSURE, 100);
 
-    // force initial exposure to avoid orange hue
-    // camera.read(frame);
-    // system("v4l2-ctl -c exposure=10000");
-    //system("v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=0");
+    // Set exposure and gain. A frame is read before setting params, otherwise settings wont be saved.
+    camera.read(frame);
+    system("v4l2-ctl -c exposure=2000");
+    system("v4l2-ctl -c gain=250");
 }
 
 bool Camera::read()
@@ -42,10 +34,6 @@ bool Camera::read()
     camera.read( frame );
     if (frame.empty())
         return false;
-
-    // Convert to RGB
-    // cv::cvtColor(frame,frame, cv::COLOR_BayerGR2RGB);
-    //cv::convertScaleAbs(frame, frame, 0.25, 0);
 
     return true;
 }

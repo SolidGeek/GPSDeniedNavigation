@@ -17,6 +17,7 @@ int32_t Telemetry::process( uint8_t byte ){
 }
 
 bool Telemetry::parse( mavlink_message_t msg ){
+    // Switch on the mavlink message ID
     switch( msg.msgid ){
         case MAVLINK_MSG_ID_HIGHRES_IMU: mavlink_msg_highres_imu_decode(&msg, &data.imu); break;
         case MAVLINK_MSG_ID_GPS_RAW_INT: mavlink_msg_gps_raw_int_decode(&msg, &data.gps); break;
@@ -24,9 +25,10 @@ bool Telemetry::parse( mavlink_message_t msg ){
         case MAVLINK_MSG_ID_ATTITUDE_QUATERNION: mavlink_msg_attitude_quaternion_decode(&msg, &data.attitude); break;
         case MAVLINK_MSG_ID_EXTENDED_SYS_STATE: mavlink_msg_extended_sys_state_decode(&msg, &data.status); break;
         default:
+            // If the packet was not recognised, disregard the data.
             return false;
         break;
     }
-
+    // A valid packet was received
     return true;
 }
