@@ -28,11 +28,13 @@ SOURCES += main.cpp \
     telemetry.cpp \
     src/feature_tracker.cpp \
     src/visual_odemetry.cpp \
-    timing.cpp
+    timing.cpp \
+    logger.cpp
 
 HEADERS += serial.h \
     camera.h \
     telemetry.h \
     src/feature_tracker.h \
     src/visual_odemetry.h \
-    timing.h
+    timing.h \
+    logger.h

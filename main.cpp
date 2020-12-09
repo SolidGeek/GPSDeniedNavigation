@@ -1,55 +1,44 @@
 #include <iostream>
 #include <unistd.h>
 #include <string>
+#include <math.h>
+#include <thread>
+
 #include "timing.h"
 #include "serial.h"
 #include "camera.h"
 #include "telemetry.h"
+#include "logger.h"
 #include "visual_odemetry.h"
-
-#include <math.h>
-#include <thread>
-
 
 #define IMAGE_WIDTH 640
 #define IMAGE_HEIGHT 480
 
-#define CAMERA_SAMPLE_TIME 3.333e4 // in us, given a rate of 30 Hz
+#define LOG_SAMPLE_TIME     2e4     // in us, a rate of 50Hz
+#define CAMERA_SAMPLE_TIME  3.333e4 // in us, given a rate of 30 Hz
 
-// Init of serial port
+const std::string path = "/home/dev/GPSDeniedNavigation/log";
+
+// Initialization of classes
 Serial px4_uart("/dev/ttyTHS1", SERIAL_READ);
+Camera cam;
+VisualOdemetry vo;
+Telemetry tlm;
+Logger data_log(path);
 
 // Serial servo_uart("/dev/ttyUSB0", SERIAL_WRITE);
 
-Telemetry tlm;
-Camera cam;
-VisualOdemetry vo;
-
-float dt;
-uint32_t last_time_quat;
-uint32_t last_time_imu;
-uint32_t last_time_pos;
-uint32_t last_time_cam;
-
-cv::Point2f velocity;
-
-// For mavlink packages
-uint8_t byte;
-uint32_t msgid;
-
-// For uart communication
-char write_buf[10];
-
-float pos_x = 300;
-float pos_y = 300;
-
-// Data from mavlink
-float qw = 0, qx = 0, qy = 0, qz = 0, roll = 0, yaw = 0;
-
-cv::Mat map = cv::Mat::zeros(cv::Size(600,600),CV_8UC1);
+// Global flags
+static bool log_data_flag = false;
 
 void mavlink_thread(){
 
+    // For mavlink packages
+    uint8_t byte;
+    uint32_t msgid;
+    float dt;
+
+    // UART communication setup
     px4_uart.setup( SERIAL_TYPE_THS, B115200 );
 
     while(1){
@@ -59,33 +48,57 @@ void mavlink_thread(){
 
             switch( msgid ){
                 case MAVLINK_MSG_ID_EXTENDED_SYS_STATE:
-                    printf("Heartbeat");
+                    if( tlm.state.landed_state == 2 ){
+                        log_data_flag = true;
+                    }
                 break;
 
                 case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
+                    dt = (float)(micros()-tlm.att_time)/1e6;
 
-                    qw = tlm.data.attitude.q1;
-                    qx = tlm.data.attitude.q2;
-                    qy = tlm.data.attitude.q3;
-                    qz = tlm.data.attitude.q4;
-
-                    roll = atan2( -2*(qy*qz - qx*qw), pow(qw,2) - pow(qx,2) - pow(qy,2) + pow(qz,2) );
-                    yaw = atan2( -2*(qx*qy - qz*qw), pow(qw,2) + pow(qx,2) - pow(qy,2) - pow(qz,2) );
-
-                    dt = (float)(micros()-last_time_quat)/1e6;
-                    last_time_quat = micros();
-                    //printf("Yaw: %+.4f \n", yaw);
-
+                    data_log.data.quat_rdy   = true;
+                    data_log.data.q1         = tlm.att.q1;
+                    data_log.data.q2         = tlm.att.q2;
+                    data_log.data.q3         = tlm.att.q3;
+                    data_log.data.q4         = tlm.att.q4;
                 break;
 
                 case MAVLINK_MSG_ID_HIGHRES_IMU:
-                    dt = (float)(micros()-last_time_imu)/1e6;
-                    last_time_imu = micros();
-                    //printf("IMU: %+.2f \n", 1/dt);
+                    dt = (float)(micros()-tlm.imu_time)/1e6;
+
+                    data_log.data.imu_rdy        = true;
+                    data_log.data.ax             = tlm.imu.xacc;
+                    data_log.data.ay             = tlm.imu.yacc;
+                    data_log.data.az             = tlm.imu.zacc;
+                    data_log.data.gx             = tlm.imu.xgyro;
+                    data_log.data.gy             = tlm.imu.ygyro;
+                    data_log.data.gz             = tlm.imu.zgyro;
+                    data_log.data.imu_alt        = tlm.imu.pressure_alt;
+                    data_log.data.imu_temp       = tlm.imu.temperature;
+                    data_log.data.imu_abs_pres   = tlm.imu.abs_pressure;
                 break;
 
                 case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-                    // Log position
+                    dt = (float)(micros()-tlm.pos_time)/1e6;
+
+                    data_log.data.pos_rdy    = true;
+                    data_log.data.pos_lat    = tlm.pos.lat;
+                    data_log.data.pos_lon    = tlm.pos.lon;
+                    data_log.data.pos_alt    = tlm.pos.alt;
+                    data_log.data.pos_vx     = tlm.pos.vx;
+                    data_log.data.pos_vy     = tlm.pos.vy;
+                    data_log.data.pos_vz     = tlm.pos.vz;
+                break;
+
+                case MAVLINK_MSG_ID_GPS_RAW_INT:
+                    dt = (float)(micros()-tlm.gps_time)/1e6;
+
+                    data_log.data.gps_rdy    = true;
+                    data_log.data.gps_lat    = tlm.gps.lat;
+                    data_log.data.gps_lon    = tlm.gps.lon;
+                    data_log.data.gps_alt    = tlm.gps.alt;
+                    data_log.data.gps_cog    = tlm.gps.cog;
+                    data_log.data.gps_v      = tlm.gps.vel;
                 break;
             }
         }
@@ -94,71 +107,88 @@ void mavlink_thread(){
 
 void camera_thread(){
 
-    cv::Mat display;
+    float dt = 0;
+    uint64_t last_time = 0;
 
     cam.config( IMAGE_WIDTH, IMAGE_HEIGHT );
     vo.config( IMAGE_WIDTH, IMAGE_HEIGHT, 40 );
 
-    // Sample camera
     while(1){
-        if( micros() - last_time_cam > CAMERA_SAMPLE_TIME ){
+        dt = (float)(micros()-last_time)/1e6;
+        last_time = micros();
 
-            dt = (float)(micros()-last_time_cam)/1e6;
-            last_time_cam = micros();
+        cam.read();
+        vo.compute_sparse_flow( cam.frame, dt );
 
-            cam.read();
+        cam.show( vo.get_frame() );
 
-            vo.compute_sparse_flow( cam.frame, dt );
-
-            float dN = dt * (vo.get_vel_y() * cos(yaw) - vo.get_vel_x() * sin(yaw));
-            float dE = dt * (vo.get_vel_y() * sin(yaw) + vo.get_vel_x() * cos(yaw));
-
-            pos_x += dN;
-            pos_y += dE;
-
-            cv::Point pos((int)pos_x, (int)pos_y);
-            cv::circle(map, pos, 1, cv::Scalar(255, 255, 255));
-
-            display = vo.get_frame();
-
-            int length = 100;
-            cv::Point P1(display.cols/2,display.rows/2);
-            cv::Point P2;
-
-            P2.x =  (int)round(P1.x + length * cos(yaw));
-            P2.y =  (int)round(P1.y + length * sin(yaw));
-            cv::line(display, P1, P2, cv::Scalar(255, 255, 255), 2);
-
-            cam.show( display );
-
-            cv::imshow("Map", map);
-
-            printf("CAM: %+.2f X: %+.2f Y: %+.2f \n", 1.0/dt, dN, dE );
-
-        }
+        printf("CAM: %+.2f \n", 1.0/dt);
+        usleep(CAMERA_SAMPLE_TIME);
     }
 
     cam.stop();
 }
 
+void logger_thread(){
+
+    float dt = 0;
+    uint64_t last_time = 0;
+
+    // Clear old log
+    data_log.clear();
+
+    while( log_data_flag ){
+        dt = (float)(micros()-last_time)/1e6;
+        last_time = micros();
+
+        printf("SAVE: %+.2f \n", 1.0/dt);
+
+        data_log.save_queue();
+
+        // Save to log every 10th line
+        usleep(LOG_SAMPLE_TIME*10);
+    }
+}
+
+void data_thread(){
+
+    float dt = 0;
+    uint64_t last_time = 0;
+
+    while( log_data_flag ){
+        dt = (float)(micros()-last_time)/1e6;
+        last_time = micros();
+
+        // Add a new line to the logging queue.
+        std::string line = data_log.build_line();
+        data_log.add_to_queue( line );
+
+        // Sleep the thread until next sample.
+        usleep(LOG_SAMPLE_TIME);
+    }
+}
+
 int main()
 {
-
-    std::thread t1( camera_thread );
-    std::thread t2( mavlink_thread );
-
     // usb.setup( SERIAL_TYPE_USB, B115200 );
     // servo_uart.setup( SERIAL_TYPE_USB, B115200);
 
-    // while( true ){
+    log_data_flag = true;
 
-
-        // sprintf(buf, "A%.2f \n", angle);
-        // usb.write_string(buf); */
-    // }
+    std::thread t1( camera_thread );
+    std::thread t2( mavlink_thread );
+    std::thread t3( data_thread );
+    std::thread t4( logger_thread );
 
     t1.join();
     t2.join();
+    t3.join();
+    t4.join();
+
+    // while( true ){
+        // sprintf(buf, "A%.2f \n", angle);
+        // usb.write_string(buf); */
+    // }
 
     return 0;
 }
