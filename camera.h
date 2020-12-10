@@ -11,16 +11,21 @@ public:
 
     Camera( int index = CAMERA_ID_MAIN, int method = cv::CAP_V4L2 );
 
-    bool read();
-    bool stream();
+    bool read( void );
+    bool stream( void );
     bool show( cv::Mat frame );
     void config( int width, int height );
-    void stop();
+    void stop( void );
+
+    cv::Mat get( void );
 
     int height;
     int width;
 
     cv::Mat frame;
+
+    bool frame_rdy;
+    int frame_count;
 
 private:
 

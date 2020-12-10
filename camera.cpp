@@ -17,11 +17,14 @@ void Camera::config( int _width, int _height )
 
     width = _width;
     height = _height;
+    frame_rdy = false;
+    frame_count = 0;
 
     printf("Setting properties \n");
     camera.set(cv::CAP_PROP_FOURCC, format);
     camera.set(cv::CAP_PROP_FRAME_WIDTH, width);    // 640
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, height);  // 480
+    camera.set(cv::CAP_PROP_BUFFERSIZE, 0);
 
     // Set exposure and gain. A frame is read before setting params, otherwise settings wont be saved.
     camera.read(frame);
@@ -31,11 +34,24 @@ void Camera::config( int _width, int _height )
 
 bool Camera::read()
 {
-    camera.read( frame );
-    if (frame.empty())
+    cv::Mat temp;
+    cv::Size size(width, height);
+
+    camera.read( temp );
+
+    if (temp.empty())
         return false;
 
+    cv::resize(temp, frame, size);
+    frame_rdy = true;
+
     return true;
+}
+
+cv::Mat Camera::get(){
+    frame_rdy = false;
+    frame_count++;
+    return frame;
 }
 
 bool Camera::show( cv::Mat frame ){

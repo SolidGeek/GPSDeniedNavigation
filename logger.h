@@ -8,6 +8,10 @@
 #include <iostream>
 #include <fstream>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #define LOG_DELIMETER ";"
 
@@ -18,37 +22,41 @@ public:
     std::queue<std::string> queue;
 
     // structure to hold data temporarily
-    struct
+    struct log_data_t
     {
-        uint32_t time;
+        uint64_t time;   // 8
+
+        uint8_t imu_rdy; // 1
+        uint8_t quat_rdy; // 1
+        uint8_t gps_rdy;  // 1
+        uint8_t pos_rdy;  // 1
+
         // Highress IMU data
-        bool imu_rdy;
-        float ax, ay, az;
-        float gx, gy, gz;
-        float imu_alt;
-        float imu_temp;
-        float imu_abs_pres;
+        float ax, ay, az; // 12
+        float gx, gy, gz; // 12
+        float imu_alt; // 4
+        float imu_temp; // 4
+        float imu_abs_pres; // 4
 
         // Quaternion attitude
-        bool quat_rdy;
-        float q1, q2, q3, q4;
+        float q1, q2, q3, q4; // 16
 
         // GPS data
-        bool gps_rdy;
-        float gps_lat, gps_lon, gps_alt, gps_v, gps_cog;
+        float gps_lat, gps_lon, gps_alt; // 12
+        float gps_v, gps_cog; // 8
 
         // Global position estimate
-        bool pos_rdy;
-        float pos_lat, pos_lon, pos_alt;
-        float pos_vx, pos_vy, pos_vz;
+        float pos_lat, pos_lon, pos_alt; // 12
+        float pos_vx, pos_vy, pos_vz; // 12
 
         // Camera timestamps
-        uint32_t frame_time;
-        uint16_t frame_count;
-    } data;
+        uint64_t frame_time; // 8
+        uint32_t frame_count; // 4
+    };
 
+    log_data_t data;
 
-    Logger( const std::string path );
+    Logger( const std::string path, int log_size = 2500 ); // 4096b * 250 = 10.24mb
 
     void clear( void );
 
@@ -57,6 +65,16 @@ public:
     void add_to_queue( std::string str );
 
     std::string build_line( void );
+
+    // Memory mapping instead of CSV file
+    log_data_t * mem_log;
+    uint32_t mem_index;
+    int mem_file;
+
+    void mem_add_line( void );
+    void mem_sync_file( void );
+    void mem_close_file( void );
+    void mem_log_start( void );
 
 private:
 
