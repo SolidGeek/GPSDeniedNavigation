@@ -113,7 +113,6 @@ std::string Logger::build_line(){
     line += std::to_string( data.gz ) + LOG_DELIMETER;
     line += std::to_string( data.imu_alt ) + LOG_DELIMETER;
     line += std::to_string( data.imu_temp ) + LOG_DELIMETER;
-    line += std::to_string( data.imu_abs_pres ) + LOG_DELIMETER;
 
     // Quaternion data
     line += std::to_string( data.quat_rdy ) + LOG_DELIMETER;

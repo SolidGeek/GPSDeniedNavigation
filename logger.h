@@ -36,18 +36,17 @@ public:
         float gx, gy, gz; // 12
         float imu_alt; // 4
         float imu_temp; // 4
-        float imu_abs_pres; // 4
 
         // Quaternion attitude
         float q1, q2, q3, q4; // 16
 
         // GPS data
-        float gps_lat, gps_lon, gps_alt; // 12
-        float gps_v, gps_cog; // 8
+        int32_t gps_lat, gps_lon, gps_alt; // 12
+        uint16_t gps_v, gps_cog; // 8
 
         // Global position estimate
-        float pos_lat, pos_lon, pos_alt; // 12
-        float pos_vx, pos_vy, pos_vz; // 12
+        int32_t pos_lat, pos_lon, pos_alt, pos_alt_rel; // 16
+        int16_t pos_vx, pos_vy, pos_vz; // 12
 
         // Camera timestamps
         uint64_t frame_time; // 8

@@ -30,7 +30,7 @@ Logger data_log(path);
 // Serial servo_uart("/dev/ttyUSB0", SERIAL_WRITE);
 
 // Global flags
-static bool logging_data_flag = true;
+static bool logging_data_flag = false;
 static bool camera_live_feed = false;
 
 void mavlink_thread(){
@@ -38,7 +38,6 @@ void mavlink_thread(){
     // For mavlink packages
     uint8_t byte;
     uint32_t msgid;
-    float dt;
 
     // UART communication setup
     px4_uart.setup( SERIAL_TYPE_THS, B115200 );
@@ -50,14 +49,16 @@ void mavlink_thread(){
 
             switch( msgid ){
                 case MAVLINK_MSG_ID_EXTENDED_SYS_STATE:
-                    printf("SYS_STATE %d \n", tlm.state.landed_state);
+                    printf("SYS_STATE: %d \n", tlm.state.landed_state);
                     if( tlm.state.landed_state == MAV_LANDED_STATE_IN_AIR ){
                         logging_data_flag = true;
+                    }else{
+                        logging_data_flag = false;
                     }
                 break;
 
                 case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
-                    dt = (float)(micros()-tlm.att_time)/1e6;
+                    // dt = (float)(micros()-tlm.att_time)/1e6;
 
                     data_log.data.quat_rdy   = true;
                     data_log.data.q1         = tlm.att.q1;
@@ -67,7 +68,7 @@ void mavlink_thread(){
                 break;
 
                 case MAVLINK_MSG_ID_HIGHRES_IMU:
-                    dt = (float)(micros()-tlm.imu_time)/1e6;
+                    //dt = (float)(micros()-tlm.imu_time)/1e6;
 
                     data_log.data.imu_rdy        = true;
                     data_log.data.ax             = tlm.imu.xacc;
@@ -78,23 +79,23 @@ void mavlink_thread(){
                     data_log.data.gz             = tlm.imu.zgyro;
                     data_log.data.imu_alt        = tlm.imu.pressure_alt;
                     data_log.data.imu_temp       = tlm.imu.temperature;
-                    data_log.data.imu_abs_pres   = tlm.imu.abs_pressure;
                 break;
 
                 case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-                    dt = (float)(micros()-tlm.pos_time)/1e6;
+                    //dt = (float)(micros()-tlm.pos_time)/1e6;
 
-                    data_log.data.pos_rdy    = true;
-                    data_log.data.pos_lat    = tlm.pos.lat;
-                    data_log.data.pos_lon    = tlm.pos.lon;
-                    data_log.data.pos_alt    = tlm.pos.alt;
-                    data_log.data.pos_vx     = tlm.pos.vx;
-                    data_log.data.pos_vy     = tlm.pos.vy;
-                    data_log.data.pos_vz     = tlm.pos.vz;
+                    data_log.data.pos_rdy       = true;
+                    data_log.data.pos_lat       = tlm.pos.lat;
+                    data_log.data.pos_lon       = tlm.pos.lon;
+                    data_log.data.pos_alt       = tlm.pos.alt;
+                    data_log.data.pos_vx        = tlm.pos.vx;
+                    data_log.data.pos_vy        = tlm.pos.vy;
+                    data_log.data.pos_vz        = tlm.pos.vz;
+                    data_log.data.pos_alt_rel   = tlm.pos.relative_alt;
                 break;
 
                 case MAVLINK_MSG_ID_GPS_RAW_INT:
-                    dt = (float)(micros()-tlm.gps_time)/1e6;
+                    //dt = (float)(micros()-tlm.gps_time)/1e6;
 
                     data_log.data.gps_rdy    = true;
                     data_log.data.gps_lat    = tlm.gps.lat;
@@ -160,7 +161,7 @@ void video_thread(){
                 // Make new video file
                 camera_rolling = true;
                 video.open(path + "/video.avi", format, 30, cv::Size(IMAGE_WIDTH, IMAGE_HEIGHT));
-                printf("Started recording");
+                printf("VIDEO: Recording \n");
             }
 
             if( cam.frame_rdy && camera_rolling ){
@@ -170,7 +171,7 @@ void video_thread(){
             if( camera_rolling ){
                 camera_rolling = false;
                 video.release();
-                printf("Stoped recording");
+                printf("VIDEO: Stopped \n");
             }
         }
         usleep(TIME_1_MS);
@@ -183,11 +184,11 @@ void sync_thread(){
         // Only sync log if is logging
         if( logging_data_flag ){
             data_log.mem_sync_file();
-
+            printf("Log line: %d \n", data_log.mem_index );
         }
 
         // Save to file every 10th line
-        usleep(LOG_SAMPLE_TIME*10);
+        usleep(LOG_SAMPLE_TIME*100);
     }
 
     /*
@@ -213,17 +214,15 @@ void log_thread(){
 
     while( 1 ){
 
-        if( data_log.mem_index >= 1000){
+        /* if( data_log.mem_index >= 1000){
             logging_data_flag = false;
-        }
+        } */
 
         // Only log while in air
         if( logging_data_flag ){
 
-            printf("Log line: %d \n", data_log.mem_index );
-
             if( !logging_started ){
-                printf("Logging started");
+                printf("LOG: Started \n");
                 data_log.mem_log_start();
                 logging_started = true;
             }
@@ -240,7 +239,7 @@ void log_thread(){
 
         }else {
             if( logging_started ){
-                printf("Logging done");
+                printf("LOG: Stopped \n");
                 data_log.mem_close_file();
                 logging_started = false;
             }
@@ -269,6 +268,9 @@ int main()
 
     // usb.setup( SERIAL_TYPE_USB, B115200 );
     // servo_uart.setup( SERIAL_TYPE_USB, B115200);
+
+    // Do not start logging, before in AIR
+    logging_data_flag = false;
 
     std::thread t1( camera_thread );
     std::thread t2( video_thread );
