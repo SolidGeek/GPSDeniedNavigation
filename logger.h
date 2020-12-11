@@ -56,7 +56,7 @@ public:
 
     log_data_t data;
 
-    Logger( const std::string path, int log_size = 2500 ); // 4096b * 250 = 10.24mb
+    Logger( const std::string path ); // 4096b * 250 = 10.24mb
 
     void clear( void );
 
@@ -74,7 +74,7 @@ public:
     void mem_add_line( void );
     void mem_sync_file( void );
     void mem_close_file( void );
-    void mem_log_start( void );
+    void mem_log_start( int log_size = 2500 );
 
 private:
 

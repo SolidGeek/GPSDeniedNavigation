@@ -18,7 +18,7 @@ public:
     */
     VisualOdemetry();
 
-    void config( int frame_width, int frame_height, int interval = 20, float scale = 1.0 );
+    void config( int frame_width, int frame_height, int interval = 40, float scale = 1.0 );
 
     /*
      * Calculate optical flow in pixels

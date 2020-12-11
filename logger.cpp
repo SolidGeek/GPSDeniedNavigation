@@ -1,11 +1,11 @@
 #include "logger.h"
 
-Logger::Logger( const std::string path, int log_size )
+Logger::Logger( const std::string path )
 {
     log_path = (std::string)path;
 }
 
-void Logger::mem_log_start(){
+void Logger::mem_log_start(int log_size){
 
     // Memory mapping for logging
     mem_file = open("/home/dev/GPSDeniedNavigation/log/log.dat", O_CREAT | O_RDWR );

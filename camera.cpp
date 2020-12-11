@@ -24,11 +24,11 @@ void Camera::config( int _width, int _height )
     camera.set(cv::CAP_PROP_FOURCC, format);
     camera.set(cv::CAP_PROP_FRAME_WIDTH, width);    // 640
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, height);  // 480
-    camera.set(cv::CAP_PROP_BUFFERSIZE, 0);
+    camera.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
     // Set exposure and gain. A frame is read before setting params, otherwise settings wont be saved.
     camera.read(frame);
-    system("v4l2-ctl -c exposure=2000");
+    system("v4l2-ctl -c exposure=3000");
     system("v4l2-ctl -c gain=250");
 }
 

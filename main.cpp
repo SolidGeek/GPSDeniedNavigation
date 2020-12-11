@@ -15,7 +15,8 @@
 #define IMAGE_HEIGHT 650 // 1300/2
 
 #define LOG_SAMPLE_TIME     2e4 // in us, a rate of 50Hz
-#define CAMERA_SAMPLE_TIME  3.333e4 // in us, given a rate of 20 Hz
+#define CAMERA_SAMPLE_TIME  3.333e4 // in us, given a rate of 30 Hz
+#define TIME_1_MS 1e3
 
 const std::string path = "/home/dev/GPSDeniedNavigation/log";
 
@@ -30,7 +31,7 @@ Logger data_log(path);
 
 // Global flags
 static bool logging_data_flag = false;
-static bool cam_save_flag = true;
+static bool camera_live_feed = true;
 
 void mavlink_thread(){
 
@@ -49,8 +50,9 @@ void mavlink_thread(){
 
             switch( msgid ){
                 case MAVLINK_MSG_ID_EXTENDED_SYS_STATE:
-                    if( tlm.state.landed_state == 2 ){
-                        log_data_flag = true;
+                    printf("SYS_STATE %d", tlm.state.landed_state);
+                    if( tlm.state.landed_state == MAV_LANDED_STATE_IN_AIR ){
+                        logging_data_flag = true;
                     }
                 break;
 
@@ -114,7 +116,9 @@ void camera_thread(){
     uint64_t process_time = 0;
 
     cam.config( IMAGE_WIDTH, IMAGE_HEIGHT );
-    vo.config( IMAGE_WIDTH, IMAGE_HEIGHT, 40 );
+    if(camera_live_feed){
+        vo.config( IMAGE_WIDTH, IMAGE_HEIGHT, 40 );
+    }
 
     while(1){
         dt = (float)(micros()-last_time)/1e6;
@@ -122,14 +126,13 @@ void camera_thread(){
 
         timer = micros();
         cam.read();
-
-        // vo.compute_sparse_flow( cam.frame, dt );
-        // cam.show( vo.get_frame() );
-
+        if(camera_live_feed){
+            vo.compute_sparse_flow( cam.frame, dt );
+            cam.show( vo.get_frame() );
+        }
         process_time = micros() - timer;
 
         printf("CAM: %+.2f \n", 1.0/dt);
-
         usleep(CAMERA_SAMPLE_TIME - process_time);
     }
 
@@ -138,20 +141,42 @@ void camera_thread(){
 
 void video_thread(){
 
-    int format = cv::VideoWriter::fourcc('M', 'P', 'E', 'G');
-    cv::VideoWriter video(path + "/video.avi", format, 30, cv::Size(IMAGE_WIDTH, IMAGE_HEIGHT));
+    bool camera_rolling = false;
 
-    while( cam.frame_count < 100 ){
-        // Only write a new frame, if the camera thread has read an new frame
-        if( cam.frame_rdy ){
-            video.write( cam.get() );
-            printf("NEW FRAME %d \n", cam.frame_count);
+    int format = cv::VideoWriter::fourcc('M', 'P', 'E', 'G');
+    cv::VideoWriter video;
+
+    while( 1 ){
+
+        if( cam.frame_count > 1000 ){
+            logging_data_flag = false;
         }
 
+        // Only write a new frame, if the camera thread has read an new frame
+        if(logging_data_flag){
+
+            if( ! camera_rolling ){
+                // Make new video file
+                camera_rolling = true;
+                video.open(path + "/video.avi", format, 30, cv::Size(IMAGE_WIDTH, IMAGE_HEIGHT));
+                printf("Started recording");
+            }
+
+            if( cam.frame_rdy && camera_rolling ){
+                video.write( cam.get() );
+
+                data_log.data.frame_time = micros();
+                data_log.data.frame_count = cam.frame_count;
+            }
+        }else{
+            if( camera_rolling ){
+                camera_rolling = false;
+                video.release();
+                printf("Stoped recording");
+            }
+        }
+        usleep(TIME_1_MS);
     }
-
-    video.release();
-
 }
 
 void sync_thread(){
@@ -190,11 +215,13 @@ void log_thread(){
     while( 1 ){
 
         // Only log while in air
-        if( tlm.state.landed_state == MAV_LANDED_STATE_IN_AIR ){
+        if( logging_data_flag ){
 
-            if( !logging_started )
+            if( !logging_started ){
+                printf("Logging started");
                 data_log.mem_log_start();
-
+                logging_started = true;
+            }
             // Set time of sample time
             data_log.data.time = micros();
 
@@ -206,16 +233,16 @@ void log_thread(){
             data_log.data.pos_rdy = false;
             data_log.data.quat_rdy = false;
 
-            logging_data_flag = true;
         }else {
-            logging_data_flag = false;
+            if( logging_started ){
+                printf("Logging done");
+                data_log.mem_close_file();
+                logging_started = false;
+            }
         }
 
         usleep(LOG_SAMPLE_TIME);
     }
-
-    printf("Logging done");
-    data_log.mem_close_file();
 
     /* while( log_data_flag ){
         dt = (float)(micros()-last_time)/1e6;
@@ -233,12 +260,10 @@ void log_thread(){
 int main()
 {
 
-    printf("Size of struct %d \n", sizeof(Logger::log_data_t) );
+    // printf("Size of struct %d \n", sizeof(Logger::log_data_t) );
 
     // usb.setup( SERIAL_TYPE_USB, B115200 );
     // servo_uart.setup( SERIAL_TYPE_USB, B115200);
-
-    log_data_flag = true;
 
     std::thread t1( camera_thread );
     std::thread t2( video_thread );
