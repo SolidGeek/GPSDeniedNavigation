@@ -30,8 +30,8 @@ Logger data_log(path);
 // Serial servo_uart("/dev/ttyUSB0", SERIAL_WRITE);
 
 // Global flags
-static bool logging_data_flag = false;
-static bool camera_live_feed = true;
+static bool logging_data_flag = true;
+static bool camera_live_feed = false;
 
 void mavlink_thread(){
 
@@ -50,7 +50,7 @@ void mavlink_thread(){
 
             switch( msgid ){
                 case MAVLINK_MSG_ID_EXTENDED_SYS_STATE:
-                    printf("SYS_STATE %d", tlm.state.landed_state);
+                    printf("SYS_STATE %d \n", tlm.state.landed_state);
                     if( tlm.state.landed_state == MAV_LANDED_STATE_IN_AIR ){
                         logging_data_flag = true;
                     }
@@ -125,14 +125,19 @@ void camera_thread(){
         last_time = micros();
 
         timer = micros();
+
         cam.read();
+        data_log.data.frame_time = micros();
+        data_log.data.frame_count = cam.frame_count;
+
         if(camera_live_feed){
             vo.compute_sparse_flow( cam.frame, dt );
             cam.show( vo.get_frame() );
         }
+
         process_time = micros() - timer;
 
-        printf("CAM: %+.2f \n", 1.0/dt);
+        // printf("CAM: %+.2f \n", 1.0/dt);
         usleep(CAMERA_SAMPLE_TIME - process_time);
     }
 
@@ -148,10 +153,6 @@ void video_thread(){
 
     while( 1 ){
 
-        if( cam.frame_count > 1000 ){
-            logging_data_flag = false;
-        }
-
         // Only write a new frame, if the camera thread has read an new frame
         if(logging_data_flag){
 
@@ -164,9 +165,6 @@ void video_thread(){
 
             if( cam.frame_rdy && camera_rolling ){
                 video.write( cam.get() );
-
-                data_log.data.frame_time = micros();
-                data_log.data.frame_count = cam.frame_count;
             }
         }else{
             if( camera_rolling ){
@@ -185,10 +183,11 @@ void sync_thread(){
         // Only sync log if is logging
         if( logging_data_flag ){
             data_log.mem_sync_file();
+
         }
 
-        // Save to file every 100th line
-        usleep(LOG_SAMPLE_TIME*100);
+        // Save to file every 10th line
+        usleep(LOG_SAMPLE_TIME*10);
     }
 
     /*
@@ -214,8 +213,14 @@ void log_thread(){
 
     while( 1 ){
 
+        if( data_log.mem_index >= 1000){
+            logging_data_flag = false;
+        }
+
         // Only log while in air
         if( logging_data_flag ){
+
+            printf("Log line: %d \n", data_log.mem_index );
 
             if( !logging_started ){
                 printf("Logging started");

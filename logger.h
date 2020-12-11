@@ -52,7 +52,7 @@ public:
         // Camera timestamps
         uint64_t frame_time; // 8
         uint32_t frame_count; // 4
-    };
+    }__attribute__((packed));
 
     log_data_t data;
 
