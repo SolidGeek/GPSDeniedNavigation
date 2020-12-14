@@ -11,8 +11,8 @@
 #include "logger.h"
 #include "visual_odemetry.h"
 
-#define IMAGE_WIDTH 800 // 1600/2
-#define IMAGE_HEIGHT 650 // 1300/2
+#define IMAGE_WIDTH 640 // 1600/2
+#define IMAGE_HEIGHT 480 // 1300/2
 
 #define LOG_SAMPLE_TIME     2e4 // in us, a rate of 50Hz
 #define CAMERA_SAMPLE_TIME  3.333e4 // in us, given a rate of 30 Hz
@@ -31,7 +31,7 @@ Logger data_log(path);
 
 // Global flags
 static bool logging_data_flag = false;
-static bool camera_live_feed = false;
+static bool camera_live_feed = true;
 
 void mavlink_thread(){
 

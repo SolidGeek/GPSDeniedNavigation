@@ -13,7 +13,10 @@ Camera::Camera( int index, int method )
 
 void Camera::config( int _width, int _height )
 {
-    int format = cv::VideoWriter::fourcc('G','R','E','Y');
+    int format = cv::VideoWriter::fourcc('B','A','1','0'); // 1: BA10, 2: GREY
+
+    // Allocate size of frame
+    frame = cv::Mat(width, height, CV_8UC3);
 
     width = _width;
     height = _height;
@@ -21,28 +24,36 @@ void Camera::config( int _width, int _height )
     frame_count = 0;
 
     printf("Setting properties \n");
-    camera.set(cv::CAP_PROP_FOURCC, format);
+    // camera.set(cv::CAP_PROP_FOURCC, format);
+    camera.set(cv::CAP_PROP_CONVERT_RGB, 0);
     camera.set(cv::CAP_PROP_FRAME_WIDTH, width);    // 640
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, height);  // 480
     camera.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
     // Set exposure and gain. A frame is read before setting params, otherwise settings wont be saved.
     camera.read(frame);
-    system("v4l2-ctl -c exposure=600");
-    // system("v4l2-ctl -c gain=200");
+    system("v4l2-ctl -c exposure=2000"); // 500 = grey
+    system("v4l2-ctl -c gain=100");
 }
+
 
 bool Camera::read()
 {
-    cv::Mat temp;
-    cv::Size size(width, height);
+    // Input buffer (with room for 10bit bayer).
+    cv::Mat buffer(width, height, CV_16UC1);
+    cv::Mat temp(width, height, CV_16UC3);
 
-    camera.read( temp );
+    camera.read( buffer );
 
-    if (temp.empty())
+    if (buffer.empty())
         return false;
 
-    cv::resize(temp, frame, size);
+    // Decode the Bayer data to RGB but keep using 16 bits per channel
+    cv::cvtColor( buffer, temp, cv::COLOR_BayerGR2RGB );
+
+    // Scale 10bit to 8bit: 1024/256 = 0.25
+    cv::convertScaleAbs( temp, frame, 0.25 );
+
     frame_rdy = true;
 
     return true;
