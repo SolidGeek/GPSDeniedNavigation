@@ -28,8 +28,8 @@ void Camera::config( int _width, int _height )
 
     // Set exposure and gain. A frame is read before setting params, otherwise settings wont be saved.
     camera.read(frame);
-    system("v4l2-ctl -c exposure=3000");
-    system("v4l2-ctl -c gain=250");
+    system("v4l2-ctl -c exposure=600");
+    // system("v4l2-ctl -c gain=200");
 }
 
 bool Camera::read()

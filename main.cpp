@@ -179,7 +179,6 @@ void video_thread(){
 }
 
 void sync_thread(){
-
     while( 1 ){
         // Only sync log if is logging
         if( logging_data_flag ){
@@ -190,33 +189,26 @@ void sync_thread(){
         // Save to file every 10th line
         usleep(LOG_SAMPLE_TIME*100);
     }
-
-    /*
-    // Clear old log
-    data_log.clear();
-
-    while( log_data_flag ){
-        dt = (float)(micros()-last_time)/1e6;
-        last_time = micros();
-
-        printf("SAVE: %+.2f \n", 1.0/dt);
-
-        data_log.save_queue();
-
-        // Save to log every 10th line
-        usleep(LOG_SAMPLE_TIME*10);
-    }*/
 }
 
 void log_thread(){
 
     bool logging_started = false;
+    // int index = 0;
 
     while( 1 ){
 
         /* if( data_log.mem_index >= 1000){
             logging_data_flag = false;
         } */
+        
+        /* index++;
+
+        if( index > 1000 && index < 5000 ){
+            logging_data_flag = true;
+        }else{
+            logging_data_flag = false;
+        }*/
 
         // Only log while in air
         if( logging_data_flag ){
