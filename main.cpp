@@ -31,7 +31,7 @@ Logger data_log(path);
 
 // Global flags
 static bool logging_data_flag = false;
-static bool camera_live_feed = true;
+static bool camera_live_feed = false;
 
 void mavlink_thread(){
 
